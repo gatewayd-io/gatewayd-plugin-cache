@@ -1,2 +1,3 @@
 # gatewayd-plugin-cache
-GatewayD Plugin for caching query results
+
+GatewayD plugin for caching query results
