@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"os"
-	"strconv"
 
 	redis_store "github.com/eko/gocache/store/redis/v4"
 	"github.com/gatewayd-io/gatewayd-plugin-cache/plugin"
@@ -13,7 +12,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
-	"github.com/mitchellh/mapstructure"
 )
 
 func main() {
@@ -37,15 +35,12 @@ func main() {
 		),
 	})
 
-	var config map[string]interface{}
-	mapstructure.Decode(plugin.PluginConfig["config"], &config)
-	if metricsEnabled, err := strconv.ParseBool(config["metricsEnabled"].(string)); err == nil {
-		metricsConfig := metrics.MetricsConfig{
-			Enabled:          metricsEnabled,
-			UnixDomainSocket: config["metricsUnixDomainSocket"].(string),
-			Endpoint:         config["metricsEndpoint"].(string),
-		}
-		go metrics.ExposeMetrics(metricsConfig, logger)
+	var config *metrics.MetricsConfig
+	if cfg, ok := plugin.PluginConfig["config"].(map[string]interface{}); ok {
+		config = metrics.NewMetricsConfig(cfg)
+	}
+	if config != nil && config.Enabled {
+		go metrics.ExposeMetrics(config, logger)
 	}
 
 	goplugin.Serve(&goplugin.ServeConfig{
