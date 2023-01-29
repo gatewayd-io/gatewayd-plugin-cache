@@ -35,6 +35,8 @@ var (
 		"license":    "Apache-2.0",
 		"projectUrl": "https://github.com/gatewayd-io/gatewayd-plugin-cache",
 		"config": map[string]interface{}{
+			// If you expect to run multiple instances of this plugin, you should
+			// set a unique socket path for each instance.
 			"socketPath":  "/tmp/gatewayd-plugin-test.sock",
 			"metricsPath": "/metrics",
 		},
