@@ -6,6 +6,7 @@ verificationPolicy: "passdown"
 compatibilityPolicy: "strict"
 # Possible values: "accept" (default) and "reject"
 acceptancePolicy: "accept"
+metricsMergerPeriod: 5s
 
 plugins:
   # Plugin name
