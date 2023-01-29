@@ -99,10 +99,13 @@ func (p *Plugin) OnTrafficFromClient(
 		if r[0] == 'Q' { // Query
 			response, err := cacheManager.Get(ctx, request)
 			if err != nil {
+				CacheMissesCounter.Inc()
 				p.Logger.Error("Failed to get cache", err)
 			}
+			CacheGetsCounter.Inc()
 
 			if response != "" {
+				CacheHitsCounter.Inc()
 				// The response is cached.
 				return structpb.NewStruct(map[string]interface{}{
 					"terminate": true,
@@ -126,8 +129,10 @@ func (p *Plugin) OnTrafficFromServer(
 		// A PostgreSQL response is received from the client.
 		if r[0] == 'T' { // RowDescription
 			if err := cacheManager.Set(ctx, request, response); err != nil {
+				CacheMissesCounter.Inc()
 				p.Logger.Error("Failed to set cache", err)
 			}
+			CacheSetsCounter.Inc()
 		}
 	}
 
