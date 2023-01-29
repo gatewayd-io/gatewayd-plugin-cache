@@ -4,7 +4,9 @@ import (
 	"flag"
 	"os"
 
+	redis_store "github.com/eko/gocache/store/redis/v4"
 	"github.com/gatewayd-io/gatewayd-plugin-cache/plugin"
+	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
 )
@@ -22,6 +24,11 @@ func main() {
 	})
 	pluginInstance := plugin.NewCachePlugin(plugin.Plugin{
 		Logger: logger,
+		RedisStore: redis_store.NewRedis(
+			redis.NewClient(&redis.Options{
+				Addr: os.Getenv("REDIS_ADDR"),
+			}),
+		),
 	})
 	goplugin.Serve(&goplugin.ServeConfig{
 		HandshakeConfig: goplugin.HandshakeConfig{

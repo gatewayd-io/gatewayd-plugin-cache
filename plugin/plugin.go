@@ -2,7 +2,10 @@ package plugin
 
 import (
 	"context"
+	"encoding/base64"
 
+	"github.com/eko/gocache/lib/v4/cache"
+	"github.com/eko/gocache/store/redis/v4"
 	plugin_v1 "github.com/gatewayd-io/gatewayd-plugin-cache/plugin/v1"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
@@ -23,7 +26,8 @@ var PluginMap = map[string]goplugin.Plugin{
 type Plugin struct {
 	goplugin.GRPCPlugin
 	plugin_v1.GatewayDPluginServiceServer
-	Logger hclog.Logger
+	Logger     hclog.Logger
+	RedisStore *redis.RedisStore
 }
 
 type CachePlugin struct {
@@ -71,6 +75,7 @@ func (p *Plugin) GetPluginConfig(
 		"hooks": []interface{}{
 			"onConfigLoaded",
 			"onTrafficFromClient",
+			"onTrafficFromServer",
 		},
 		"tags":       []interface{}{"test", "plugin"},
 		"categories": []interface{}{"test"},
@@ -86,5 +91,45 @@ func (p *Plugin) OnConfigLoaded(
 // OnTrafficFromClient is called when a request is received by GatewayD from the client.
 func (p *Plugin) OnTrafficFromClient(
 	ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
+	cacheManager := cache.New[string](p.RedisStore)
+
+	request := req.Fields["request"].GetStringValue()
+	if r, err := base64.StdEncoding.DecodeString(request); err == nil {
+		// A PostgreSQL request is received from the client.
+		if r[0] == 'Q' { // Query
+			response, err := cacheManager.Get(ctx, request)
+			if err != nil {
+				p.Logger.Error("Failed to get cache", err)
+			}
+
+			if response != "" {
+				// The response is cached.
+				return structpb.NewStruct(map[string]interface{}{
+					"terminate": true,
+					"response":  response,
+				})
+			}
+		}
+	}
+
+	return req, nil
+}
+
+// OnTrafficFromServer is called when a response is received by GatewayD from the server.
+func (p *Plugin) OnTrafficFromServer(
+	ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
+	cacheManager := cache.New[string](p.RedisStore)
+
+	request := req.Fields["request"].GetStringValue()
+	response := req.Fields["response"].GetStringValue()
+	if r, err := base64.StdEncoding.DecodeString(response); err == nil {
+		// A PostgreSQL response is received from the client.
+		if r[0] == 'T' { // RowDescription
+			if err := cacheManager.Set(ctx, request, response); err != nil {
+				p.Logger.Error("Failed to set cache", err)
+			}
+		}
+	}
+
 	return req, nil
 }
