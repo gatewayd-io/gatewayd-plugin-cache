@@ -37,7 +37,7 @@ var (
 		"config": map[string]interface{}{
 			// If you expect to run multiple instances of this plugin, you should
 			// set a unique socket path for each instance.
-			"socketPath":  "/tmp/gatewayd-plugin-test.sock",
+			"socketPath":  "/tmp/gatewayd-plugin-cache.sock",
 			"metricsPath": "/metrics",
 		},
 		"hooks": []interface{}{
