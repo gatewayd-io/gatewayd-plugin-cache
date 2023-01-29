@@ -8,6 +8,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/hashicorp/go-hclog v1.4.0
 	github.com/hashicorp/go-plugin v1.4.8
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/prometheus/client_golang v1.14.0
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
