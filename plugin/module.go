@@ -1,12 +1,12 @@
 package plugin
 
 import (
-	pluginV1 "github.com/gatewayd-io/gatewayd-plugin-cache/plugin/v1"
+	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	goplugin "github.com/hashicorp/go-plugin"
 )
 
 var (
-	PluginID = pluginV1.PluginID{
+	PluginID = v1.PluginID{
 		Name:      "gatewayd-plugin-cache",
 		Version:   "0.0.1",
 		RemoteUrl: "github.com/gatewayd-io/gatewayd-plugin-cache",

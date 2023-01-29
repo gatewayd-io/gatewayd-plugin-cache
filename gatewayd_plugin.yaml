@@ -26,4 +26,4 @@ plugins:
       - MAGIC_COOKIE_KEY=GATEWAYD_PLUGIN
       - MAGIC_COOKIE_VALUE=5712b87aa5d7e9f9e9ab643e6603181c5b796015cb1c09d6f5ada882bf2a1872
     # Checksum hash to verify the binary before loading
-    checksum: d86496fba6ca404ac35b20d473a0a4c6b287092027c5184273ebb72d33792889
+    checksum: e5be75518cf9d5ff5fd81a54555a17cd401d80cd1fbef0bef6bff1fea44cafee

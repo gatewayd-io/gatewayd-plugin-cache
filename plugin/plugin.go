@@ -6,7 +6,7 @@ import (
 
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/store/redis/v4"
-	pluginV1 "github.com/gatewayd-io/gatewayd-plugin-cache/plugin/v1"
+	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
@@ -15,7 +15,7 @@ import (
 
 type Plugin struct {
 	goplugin.GRPCPlugin
-	pluginV1.GatewayDPluginServiceServer
+	v1.GatewayDPluginServiceServer
 	Logger     hclog.Logger
 	RedisStore *redis.RedisStore
 }
@@ -35,13 +35,13 @@ func NewCachePlugin(impl Plugin) *CachePlugin {
 
 // GRPCServer registers the plugin with the gRPC server.
 func (p *CachePlugin) GRPCServer(b *goplugin.GRPCBroker, s *grpc.Server) error {
-	pluginV1.RegisterGatewayDPluginServiceServer(s, &p.Impl)
+	v1.RegisterGatewayDPluginServiceServer(s, &p.Impl)
 	return nil
 }
 
 // GRPCClient returns the plugin client.
 func (p *CachePlugin) GRPCClient(ctx context.Context, b *goplugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return pluginV1.NewGatewayDPluginServiceClient(c), nil
+	return v1.NewGatewayDPluginServiceClient(c), nil
 }
 
 // GetPluginConfig returns the plugin config.
