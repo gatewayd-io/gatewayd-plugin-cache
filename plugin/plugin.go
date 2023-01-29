@@ -13,15 +13,40 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-var PluginID = pluginV1.PluginID{
-	Name:      "gatewayd-plugin-cache",
-	Version:   "0.0.1",
-	RemoteUrl: "github.com/gatewayd-io/gatewayd-plugin-cache",
-}
-
-var PluginMap = map[string]goplugin.Plugin{
-	PluginID.Name: &CachePlugin{},
-}
+var (
+	PluginID = pluginV1.PluginID{
+		Name:      "gatewayd-plugin-cache",
+		Version:   "0.0.1",
+		RemoteUrl: "github.com/gatewayd-io/gatewayd-plugin-cache",
+	}
+	PluginMap = map[string]goplugin.Plugin{
+		PluginID.Name: &CachePlugin{},
+	}
+	Config = map[string]interface{}{
+		"id": map[string]interface{}{
+			"name":      PluginID.Name,
+			"version":   PluginID.Version,
+			"remoteUrl": PluginID.RemoteUrl,
+		},
+		"description": "GatewayD plugin for caching query results",
+		"authors": []interface{}{
+			"Mostafa Moradian <mostafa@gatewayd.io>",
+		},
+		"license":    "Apache-2.0",
+		"projectUrl": "https://github.com/gatewayd-io/gatewayd-plugin-cache",
+		"config": map[string]interface{}{
+			"socketPath":  "/tmp/gatewayd-plugin-test.sock",
+			"metricsPath": "/metrics",
+		},
+		"hooks": []interface{}{
+			"onConfigLoaded",
+			"onTrafficFromClient",
+			"onTrafficFromServer",
+		},
+		"tags":       []interface{}{"test", "plugin"},
+		"categories": []interface{}{"test"},
+	}
+)
 
 type Plugin struct {
 	goplugin.GRPCPlugin
@@ -57,29 +82,7 @@ func (p *CachePlugin) GRPCClient(ctx context.Context, b *goplugin.GRPCBroker, c 
 // GetPluginConfig returns the plugin config.
 func (p *Plugin) GetPluginConfig(
 	ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
-	return structpb.NewStruct(map[string]interface{}{
-		"id": map[string]interface{}{
-			"name":      PluginID.Name,
-			"version":   PluginID.Version,
-			"remoteUrl": PluginID.RemoteUrl,
-		},
-		"description": "GatewayD plugin for caching query results",
-		"authors": []interface{}{
-			"Mostafa Moradian <mostafa@gatewayd.io>",
-		},
-		"license":    "Apache-2.0",
-		"projectUrl": "https://github.com/gatewayd-io/gatewayd-plugin-cache",
-		"config": map[string]interface{}{
-			"key": "value",
-		},
-		"hooks": []interface{}{
-			"onConfigLoaded",
-			"onTrafficFromClient",
-			"onTrafficFromServer",
-		},
-		"tags":       []interface{}{"test", "plugin"},
-		"categories": []interface{}{"test"},
-	})
+	return structpb.NewStruct(Config)
 }
 
 // OnConfigLoaded is called when the global config is loaded by GatewayD.
