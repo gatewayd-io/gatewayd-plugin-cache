@@ -16,7 +16,7 @@ import (
 
 func main() {
 	// Parse command line flags, passed by GatewayD via the plugin config
-	logLevel := flag.String("log-level", "debug", "Log level")
+	logLevel := flag.String("log-level", "info", "Log level")
 	flag.Parse()
 
 	logger := hclog.New(&hclog.LoggerOptions{
