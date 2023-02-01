@@ -2,10 +2,10 @@ package plugin
 
 import (
 	"context"
-	"encoding/base64"
 
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/store/redis/v4"
+	"github.com/gatewayd-io/gatewayd-plugin-sdk/databases/postgres"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
@@ -61,11 +61,15 @@ func (p *Plugin) OnTrafficFromClient(
 	ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
 	cacheManager := cache.New[string](p.RedisStore)
 
-	request := req.Fields["request"].GetStringValue()
-	if r, err := base64.StdEncoding.DecodeString(request); err == nil {
-		// A PostgreSQL request is received from the client.
-		if r[0] == 'Q' { // Query
-			response, err := cacheManager.Get(ctx, request)
+	req, err := postgres.HandleClientMessage(req, p.Logger)
+	if err != nil {
+		p.Logger.Error("Failed to handle client message", err)
+	}
+
+	if query, ok := req.Fields["query"]; ok {
+		if query.GetStringValue() != "" {
+			p.Logger.Trace("Query", "query", query.GetStringValue())
+			response, err := cacheManager.Get(ctx, req.Fields["request"].GetStringValue())
 			if err != nil {
 				CacheMissesCounter.Inc()
 				p.Logger.Error("Failed to get cache", err)
@@ -88,15 +92,20 @@ func (p *Plugin) OnTrafficFromClient(
 
 // OnTrafficFromServer is called when a response is received by GatewayD from the server.
 func (p *Plugin) OnTrafficFromServer(
-	ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
+	ctx context.Context, resp *structpb.Struct) (*structpb.Struct, error) {
 	cacheManager := cache.New[string](p.RedisStore)
 
-	request := req.Fields["request"].GetStringValue()
-	response := req.Fields["response"].GetStringValue()
-	if r, err := base64.StdEncoding.DecodeString(response); err == nil {
-		// A PostgreSQL response is received from the client.
-		if r[0] == 'T' { // RowDescription
-			if err := cacheManager.Set(ctx, request, response); err != nil {
+	resp, err := postgres.HandleServerMessage(resp, p.Logger)
+	if err != nil {
+		p.Logger.Error("Failed to handle server message", err)
+	}
+
+	if rowDescription, ok := resp.Fields["rowDescription"]; ok {
+		if rowDescription.GetStringValue() != "" {
+			if err := cacheManager.Set(
+				ctx,
+				resp.Fields["request"].GetStringValue(),
+				resp.Fields["response"].GetStringValue()); err != nil {
 				CacheMissesCounter.Inc()
 				p.Logger.Error("Failed to set cache", err)
 			}
@@ -104,5 +113,5 @@ func (p *Plugin) OnTrafficFromServer(
 		}
 	}
 
-	return req, nil
+	return resp, nil
 }
