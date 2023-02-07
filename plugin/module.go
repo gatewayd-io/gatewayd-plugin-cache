@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	sdkConfig "github.com/gatewayd-io/gatewayd-plugin-sdk/config"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	goplugin "github.com/hashicorp/go-plugin"
 )
@@ -28,9 +29,10 @@ var (
 		"projectUrl": "https://github.com/gatewayd-io/gatewayd-plugin-cache",
 		// Compile-time configuration
 		"config": map[string]interface{}{
-			"metricsEnabled":          "true",
-			"metricsUnixDomainSocket": "/tmp/gatewayd-plugin-cache.sock",
-			"metricsEndpoint":         "/metrics",
+			"metricsEnabled": sdkConfig.GetEnv("METRICS_ENABLED", "true"),
+			"metricsUnixDomainSocket": sdkConfig.GetEnv(
+				"METRICS_UNIX_DOMAIN_SOCKET", "/tmp/gatewayd-plugin-cache.sock"),
+			"metricsEndpoint": sdkConfig.GetEnv("METRICS_ENDPOINT", "/metrics"),
 		},
 		"hooks": []interface{}{
 			"onConfigLoaded",
