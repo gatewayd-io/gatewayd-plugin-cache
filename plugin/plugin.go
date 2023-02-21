@@ -103,10 +103,13 @@ func (p *Plugin) OnTrafficFromServer(
 
 	rowDescription := sdkPlugin.GetAttr(resp, "rowDescription", "")
 	dataRow := sdkPlugin.GetAttr(resp, "dataRow", []interface{}{})
+	errorResponse := sdkPlugin.GetAttr(resp, "errorResponse", "")
 	request := sdkPlugin.GetAttr(resp, "request", "")
 	response := sdkPlugin.GetAttr(resp, "response", "")
 
-	if rowDescription.(string) != "" && len(dataRow.([]interface{})) > 0 {
+	if errorResponse.(string) == "" &&
+		rowDescription.(string) != "" &&
+		len(dataRow.([]interface{})) > 0 {
 		if err := cacheManager.Set(ctx, request.(string), response.(string)); err != nil {
 			CacheMissesCounter.Inc()
 			p.Logger.Debug("Failed to set cache", "error", err)
