@@ -6,6 +6,7 @@ import (
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/store/redis/v4"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/databases/postgres"
+	sdkPlugin "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
@@ -63,7 +64,7 @@ func (p *Plugin) OnTrafficFromClient(
 
 	req, err := postgres.HandleClientMessage(req, p.Logger)
 	if err != nil {
-		p.Logger.Error("Failed to handle client message", err)
+		p.Logger.Info("Failed to handle client message", "error", err)
 	}
 
 	if query, ok := req.Fields["query"]; ok {
@@ -72,7 +73,7 @@ func (p *Plugin) OnTrafficFromClient(
 			response, err := cacheManager.Get(ctx, req.Fields["request"].GetStringValue())
 			if err != nil {
 				CacheMissesCounter.Inc()
-				p.Logger.Error("Failed to get cache", err)
+				p.Logger.Debug("Failed to get cached response", "error", err)
 			}
 			CacheGetsCounter.Inc()
 
@@ -97,20 +98,20 @@ func (p *Plugin) OnTrafficFromServer(
 
 	resp, err := postgres.HandleServerMessage(resp, p.Logger)
 	if err != nil {
-		p.Logger.Error("Failed to handle server message", err)
+		p.Logger.Info("Failed to handle server message", "error", err)
 	}
 
-	if rowDescription, ok := resp.Fields["rowDescription"]; ok {
-		if rowDescription.GetStringValue() != "" {
-			if err := cacheManager.Set(
-				ctx,
-				resp.Fields["request"].GetStringValue(),
-				resp.Fields["response"].GetStringValue()); err != nil {
-				CacheMissesCounter.Inc()
-				p.Logger.Error("Failed to set cache", err)
-			}
-			CacheSetsCounter.Inc()
+	rowDescription := sdkPlugin.GetAttr(resp, "rowDescription", "")
+	dataRow := sdkPlugin.GetAttr(resp, "dataRow", []interface{}{})
+	request := sdkPlugin.GetAttr(resp, "request", "")
+	response := sdkPlugin.GetAttr(resp, "response", "")
+
+	if rowDescription.(string) != "" && len(dataRow.([]interface{})) > 0 {
+		if err := cacheManager.Set(ctx, request.(string), response.(string)); err != nil {
+			CacheMissesCounter.Inc()
+			p.Logger.Debug("Failed to set cache", "error", err)
 		}
+		CacheSetsCounter.Inc()
 	}
 
 	return resp, nil
