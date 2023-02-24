@@ -30,7 +30,7 @@ func main() {
 		Logger: logger,
 		RedisStore: redis_store.NewRedis(
 			redis.NewClient(&redis.Options{
-				Addr: os.Getenv("REDIS_ADDR"),
+				Addr: sdkConfig.GetEnv("REDIS_ADDRESS", "localhost:6379"),
 			}),
 		),
 	})
