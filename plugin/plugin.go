@@ -10,6 +10,7 @@ import (
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
+	"github.com/spf13/cast"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -67,24 +68,25 @@ func (p *Plugin) OnTrafficFromClient(
 		p.Logger.Info("Failed to handle client message", "error", err)
 	}
 
-	if query, ok := req.Fields["query"]; ok {
-		if query.GetStringValue() != "" {
-			p.Logger.Trace("Query", "query", query.GetStringValue())
-			response, err := cacheManager.Get(ctx, req.Fields["request"].GetStringValue())
-			if err != nil {
-				CacheMissesCounter.Inc()
-				p.Logger.Debug("Failed to get cached response", "error", err)
-			}
-			CacheGetsCounter.Inc()
+	query := cast.ToString(sdkPlugin.GetAttr(req, "query", ""))
+	request := cast.ToString(sdkPlugin.GetAttr(req, "request", ""))
 
-			if response != "" {
-				CacheHitsCounter.Inc()
-				// The response is cached.
-				return structpb.NewStruct(map[string]interface{}{
-					"terminate": true,
-					"response":  response,
-				})
-			}
+	if query != "" {
+		p.Logger.Trace("Query", "query", query)
+		response, err := cacheManager.Get(ctx, request)
+		if err != nil {
+			CacheMissesCounter.Inc()
+			p.Logger.Debug("Failed to get cached response", "error", err)
+		}
+		CacheGetsCounter.Inc()
+
+		if response != "" {
+			CacheHitsCounter.Inc()
+			// The response is cached.
+			return structpb.NewStruct(map[string]interface{}{
+				"terminate": true,
+				"response":  response,
+			})
 		}
 	}
 
@@ -101,16 +103,14 @@ func (p *Plugin) OnTrafficFromServer(
 		p.Logger.Info("Failed to handle server message", "error", err)
 	}
 
-	rowDescription := sdkPlugin.GetAttr(resp, "rowDescription", "")
-	dataRow := sdkPlugin.GetAttr(resp, "dataRow", []interface{}{})
-	errorResponse := sdkPlugin.GetAttr(resp, "errorResponse", "")
-	request := sdkPlugin.GetAttr(resp, "request", "")
-	response := sdkPlugin.GetAttr(resp, "response", "")
+	rowDescription := cast.ToString(sdkPlugin.GetAttr(resp, "rowDescription", ""))
+	dataRow := cast.ToStringSlice(sdkPlugin.GetAttr(resp, "dataRow", []interface{}{}))
+	errorResponse := cast.ToString(sdkPlugin.GetAttr(resp, "errorResponse", ""))
+	request := cast.ToString(sdkPlugin.GetAttr(resp, "request", ""))
+	response := cast.ToString(sdkPlugin.GetAttr(resp, "response", ""))
 
-	if errorResponse.(string) == "" &&
-		rowDescription.(string) != "" &&
-		len(dataRow.([]interface{})) > 0 {
-		if err := cacheManager.Set(ctx, request.(string), response.(string)); err != nil {
+	if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
+		if err := cacheManager.Set(ctx, request, response); err != nil {
 			CacheMissesCounter.Inc()
 			p.Logger.Debug("Failed to set cache", "error", err)
 		}
