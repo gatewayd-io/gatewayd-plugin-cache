@@ -33,6 +33,7 @@ var (
 			"metricsUnixDomainSocket": sdkConfig.GetEnv(
 				"METRICS_UNIX_DOMAIN_SOCKET", "/tmp/gatewayd-plugin-cache.sock"),
 			"metricsEndpoint": sdkConfig.GetEnv("METRICS_ENDPOINT", "/metrics"),
+			"expiry":          sdkConfig.GetEnv("EXPIRY", "1h"),
 		},
 		"hooks": []interface{}{
 			"onConfigLoaded",
