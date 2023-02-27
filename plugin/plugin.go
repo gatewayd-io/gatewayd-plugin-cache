@@ -21,6 +21,7 @@ type Plugin struct {
 	v1.GatewayDPluginServiceServer
 	Logger     hclog.Logger
 	RedisStore *redis.RedisStore
+	Expiry     time.Duration
 }
 
 type CachePlugin struct {
@@ -110,12 +111,11 @@ func (p *Plugin) OnTrafficFromServer(
 	request := cast.ToString(sdkPlugin.GetAttr(resp, "request", ""))
 	response := cast.ToString(sdkPlugin.GetAttr(resp, "response", ""))
 
-	config := cast.ToStringMapString(PluginConfig["config"])
-	expiry := cast.ToDuration(config["expiry"])
+
 	var options []store.Option
-	if expiry.Seconds() > 0 {
-		p.Logger.Debug("Key expiry is set", "expiry", expiry)
-		options = append(options, store.WithExpiration(expiry))
+	if p.Expiry.Seconds() > 0 {
+		p.Logger.Debug("Key expiry is set", "expiry", p.Expiry)
+		options = append(options, store.WithExpiration(p.Expiry))
 	}
 
 	if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {

@@ -12,6 +12,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
+	"github.com/spf13/cast"
 )
 
 func main() {
@@ -38,6 +39,7 @@ func main() {
 	var config *metrics.MetricsConfig
 	if cfg, ok := plugin.PluginConfig["config"].(map[string]interface{}); ok {
 		config = metrics.NewMetricsConfig(cfg)
+		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
 	}
 	if config != nil && config.Enabled {
 		go metrics.ExposeMetrics(config, logger)
