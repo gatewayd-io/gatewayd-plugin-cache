@@ -27,4 +27,9 @@ var (
 		Name:      "cache_gets_total",
 		Help:      "The total number of cache gets",
 	})
+	CacheDeletesCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: metrics.Namespace,
+		Name:      "cache_deletes_total",
+		Help:      "The total number of cache deletes",
+	})
 )
