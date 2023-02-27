@@ -39,6 +39,7 @@ var (
 			"onConfigLoaded",
 			"onTrafficFromClient",
 			"onTrafficFromServer",
+			"onClosed",
 		},
 		"tags":       []interface{}{"test", "plugin"},
 		"categories": []interface{}{"test"},

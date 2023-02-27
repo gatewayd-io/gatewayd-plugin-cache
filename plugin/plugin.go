@@ -189,3 +189,17 @@ func (p *Plugin) OnTrafficFromServer(
 
 	return resp, nil
 }
+
+func (p *Plugin) OnClosed(ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
+	cacheManager := cache.New[string](p.RedisStore)
+	client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
+	if client != nil {
+		if err := cacheManager.Delete(ctx, client["remote"]); err != nil {
+			p.Logger.Debug("Failed to delete cache", "error", err)
+			CacheMissesCounter.Inc()
+		}
+		p.Logger.Debug("Client closed", "client", client["remote"])
+		CacheDeletesCounter.Inc()
+	}
+	return req, nil
+}
