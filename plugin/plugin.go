@@ -2,6 +2,9 @@ package plugin
 
 import (
 	"context"
+	"encoding/base64"
+	"strings"
+	"time"
 
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
@@ -70,12 +73,57 @@ func (p *Plugin) OnTrafficFromClient(
 		p.Logger.Info("Failed to handle client message", "error", err)
 	}
 
+	var database string
+	client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
+	// Try to get the database from the startup message, which is only sent once by the client.
+	// Store the database in the cache so that we can use it for subsequent requests.
+	startupMessageEncoded := cast.ToString(sdkPlugin.GetAttr(req, "startupMessage", ""))
+	if startupMessageEncoded != "" {
+		startupMessageBytes, err := base64.StdEncoding.DecodeString(startupMessageEncoded)
+		if err != nil {
+			p.Logger.Debug("Failed to decode startup message", "error", err)
+		} else {
+			startupMessage := cast.ToStringMap(string(startupMessageBytes))
+			p.Logger.Trace("Startup message", "startupMessage", startupMessage, "client", client)
+			if startupMessage != nil && client != nil {
+				startupMsgParams := cast.ToStringMapString(startupMessage["Parameters"])
+				if startupMsgParams != nil {
+					if startupMsgParams["database"] != "" && client["remote"] != "" {
+						if err := cacheManager.Set(
+							ctx, client["remote"], startupMsgParams["database"]); err != nil {
+							CacheMissesCounter.Inc()
+							p.Logger.Debug("Failed to set cache", "error", err)
+						}
+						CacheSetsCounter.Inc()
+						p.Logger.Debug("Set the database in the cache for the current session",
+							"database", database, "client", client["remote"])
+					}
+				}
+			}
+		}
+	}
+
+	// Get the database from the cache if it's not found in the startup message or
+	// if the current request is not a startup message.
+	if database == "" {
+		database, err = cacheManager.Get(ctx, client["remote"])
+		if err != nil {
+			CacheMissesCounter.Inc()
+			p.Logger.Debug("Failed to get cache", "error", err)
+		}
+		CacheGetsCounter.Inc()
+		p.Logger.Debug("Get the database in the cache for the current session",
+			"database", database, "client", client["remote"])
+	}
+
 	query := cast.ToString(sdkPlugin.GetAttr(req, "query", ""))
 	request := cast.ToString(sdkPlugin.GetAttr(req, "request", ""))
+	server := cast.ToStringMapString(sdkPlugin.GetAttr(req, "server", ""))
+	cacheKey := strings.Join([]string{server["remote"], database, request}, ":")
 
 	if query != "" {
 		p.Logger.Trace("Query", "query", query)
-		response, err := cacheManager.Get(ctx, request)
+		response, err := cacheManager.Get(ctx, cacheKey)
 		if err != nil {
 			CacheMissesCounter.Inc()
 			p.Logger.Debug("Failed to get cached response", "error", err)
@@ -110,7 +158,20 @@ func (p *Plugin) OnTrafficFromServer(
 	errorResponse := cast.ToString(sdkPlugin.GetAttr(resp, "errorResponse", ""))
 	request := cast.ToString(sdkPlugin.GetAttr(resp, "request", ""))
 	response := cast.ToString(sdkPlugin.GetAttr(resp, "response", ""))
+	server := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "server", ""))
+	client := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "client", nil))
 
+	var database string
+	if client != nil && client["remote"] != "" {
+		database, err = cacheManager.Get(ctx, client["remote"])
+		if err != nil {
+			CacheMissesCounter.Inc()
+			p.Logger.Debug("Failed to get cached response", "error", err)
+		}
+		CacheGetsCounter.Inc()
+	}
+
+	cacheKey := strings.Join([]string{server["remote"], database, request}, ":")
 
 	var options []store.Option
 	if p.Expiry.Seconds() > 0 {
@@ -119,7 +180,7 @@ func (p *Plugin) OnTrafficFromServer(
 	}
 
 	if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
-		if err := cacheManager.Set(ctx, request, response, options...); err != nil {
+		if err := cacheManager.Set(ctx, cacheKey, response, options...); err != nil {
 			CacheMissesCounter.Inc()
 			p.Logger.Debug("Failed to set cache", "error", err)
 		}
