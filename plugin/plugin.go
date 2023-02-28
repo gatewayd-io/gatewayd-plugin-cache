@@ -23,11 +23,11 @@ type Plugin struct {
 	goplugin.GRPCPlugin
 	v1.GatewayDPluginServiceServer
 
-	Logger       hclog.Logger
-	RedisStore   *redis.RedisStore
-	RedisAddress string
-	Expiry       time.Duration
-	SingleDB     bool
+	Logger        hclog.Logger
+	RedisStore    *redis.RedisStore
+	RedisAddress  string
+	Expiry        time.Duration
+	DefaultDBName string
 }
 
 type CachePlugin struct {

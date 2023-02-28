@@ -35,7 +35,7 @@ var (
 			"metricsEndpoint": sdkConfig.GetEnv("METRICS_ENDPOINT", "/metrics"),
 			"redisAddress":    sdkConfig.GetEnv("REDIS_ADDRESS", "localhost:6379"),
 			"expiry":          sdkConfig.GetEnv("EXPIRY", "1h"),
-			"singleDB":        sdkConfig.GetEnv("SINGLE_DB", "false"),
+			"defaultDBName":   sdkConfig.GetEnv("DEFAULT_DB_NAME", ""),
 		},
 		"hooks": []interface{}{
 			"onConfigLoaded",

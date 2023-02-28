@@ -40,7 +40,7 @@ func main() {
 
 		pluginInstance.Impl.RedisAddress = cast.ToString(cfg["redisAddress"])
 		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
-		pluginInstance.Impl.SingleDB = cast.ToBool(cfg["singleDB"])
+		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
 		pluginInstance.Impl.RedisStore = redis_store.NewRedis(
 			redis.NewClient(&redis.Options{
 				Addr: pluginInstance.Impl.RedisAddress,
