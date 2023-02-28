@@ -43,7 +43,7 @@ var (
 			"onTrafficFromServer",
 			"onClosed",
 		},
-		"tags":       []interface{}{"test", "plugin"},
-		"categories": []interface{}{"test"},
+		"tags":       []interface{}{"plugin", "cache", "redis", "postgres"},
+		"categories": []interface{}{"builtin", "cache", "redis", "postgres"},
 	}
 )
