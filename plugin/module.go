@@ -33,7 +33,9 @@ var (
 			"metricsUnixDomainSocket": sdkConfig.GetEnv(
 				"METRICS_UNIX_DOMAIN_SOCKET", "/tmp/gatewayd-plugin-cache.sock"),
 			"metricsEndpoint": sdkConfig.GetEnv("METRICS_ENDPOINT", "/metrics"),
+			"redisAddress":    sdkConfig.GetEnv("REDIS_ADDRESS", "localhost:6379"),
 			"expiry":          sdkConfig.GetEnv("EXPIRY", "1h"),
+			"defaultDBName":   sdkConfig.GetEnv("DEFAULT_DB_NAME", ""),
 		},
 		"hooks": []interface{}{
 			"onConfigLoaded",
@@ -41,7 +43,7 @@ var (
 			"onTrafficFromServer",
 			"onClosed",
 		},
-		"tags":       []interface{}{"test", "plugin"},
-		"categories": []interface{}{"test"},
+		"tags":       []interface{}{"plugin", "cache", "redis", "postgres"},
+		"categories": []interface{}{"builtin", "cache", "redis", "postgres"},
 	}
 )
