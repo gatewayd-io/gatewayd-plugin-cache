@@ -25,7 +25,7 @@ type Plugin struct {
 
 	Logger        hclog.Logger
 	RedisStore    *redis.RedisStore
-	RedisAddress  string
+	RedisURL      string
 	Expiry        time.Duration
 	DefaultDBName string
 }
