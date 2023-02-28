@@ -38,13 +38,18 @@ func main() {
 			go metrics.ExposeMetrics(metricsConfig, logger)
 		}
 
-		pluginInstance.Impl.RedisAddress = cast.ToString(cfg["redisAddress"])
+		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
 		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
 		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
+
+		redisConfig, err := redis.ParseURL(pluginInstance.Impl.RedisURL)
+		if err != nil {
+			logger.Error("Failed to parse Redis URL", "error", err)
+			os.Exit(1)
+		}
+
 		pluginInstance.Impl.RedisStore = redis_store.NewRedis(
-			redis.NewClient(&redis.Options{
-				Addr: pluginInstance.Impl.RedisAddress,
-			}),
+			redis.NewClient(redisConfig),
 		)
 	}
 
