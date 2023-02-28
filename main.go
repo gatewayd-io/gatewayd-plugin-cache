@@ -29,20 +29,23 @@ func main() {
 
 	pluginInstance := plugin.NewCachePlugin(plugin.Plugin{
 		Logger: logger,
-		RedisStore: redis_store.NewRedis(
-			redis.NewClient(&redis.Options{
-				Addr: sdkConfig.GetEnv("REDIS_ADDRESS", "localhost:6379"),
-			}),
-		),
 	})
 
-	var config *metrics.MetricsConfig
-	if cfg, ok := plugin.PluginConfig["config"].(map[string]interface{}); ok {
-		config = metrics.NewMetricsConfig(cfg)
+	var metricsConfig *metrics.MetricsConfig
+	if cfg := cast.ToStringMap(plugin.PluginConfig["config"]); cfg != nil {
+		metricsConfig = metrics.NewMetricsConfig(cfg)
+		if metricsConfig != nil && metricsConfig.Enabled {
+			go metrics.ExposeMetrics(metricsConfig, logger)
+		}
+
+		pluginInstance.Impl.RedisAddress = cast.ToString(cfg["redisAddress"])
 		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
-	}
-	if config != nil && config.Enabled {
-		go metrics.ExposeMetrics(config, logger)
+		pluginInstance.Impl.SingleDB = cast.ToBool(cfg["singleDB"])
+		pluginInstance.Impl.RedisStore = redis_store.NewRedis(
+			redis.NewClient(&redis.Options{
+				Addr: pluginInstance.Impl.RedisAddress,
+			}),
+		)
 	}
 
 	goplugin.Serve(&goplugin.ServeConfig{

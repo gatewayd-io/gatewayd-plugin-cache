@@ -33,7 +33,9 @@ var (
 			"metricsUnixDomainSocket": sdkConfig.GetEnv(
 				"METRICS_UNIX_DOMAIN_SOCKET", "/tmp/gatewayd-plugin-cache.sock"),
 			"metricsEndpoint": sdkConfig.GetEnv("METRICS_ENDPOINT", "/metrics"),
+			"redisAddress":    sdkConfig.GetEnv("REDIS_ADDRESS", "localhost:6379"),
 			"expiry":          sdkConfig.GetEnv("EXPIRY", "1h"),
+			"singleDB":        sdkConfig.GetEnv("SINGLE_DB", "false"),
 		},
 		"hooks": []interface{}{
 			"onConfigLoaded",
