@@ -76,22 +76,25 @@ func (p *Plugin) OnTrafficFromClient(
 		p.Logger.Info("Failed to handle client message", "error", err)
 	}
 
-	var database string
-	client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
-	// Try to get the database from the startup message, which is only sent once by the client.
-	// Store the database in the cache so that we can use it for subsequent requests.
-	startupMessageEncoded := cast.ToString(sdkPlugin.GetAttr(req, "startupMessage", ""))
-	if startupMessageEncoded != "" {
-		startupMessageBytes, err := base64.StdEncoding.DecodeString(startupMessageEncoded)
-		if err != nil {
-			p.Logger.Debug("Failed to decode startup message", "error", err)
-		} else {
-			startupMessage := cast.ToStringMap(string(startupMessageBytes))
-			p.Logger.Trace("Startup message", "startupMessage", startupMessage, "client", client)
-			if startupMessage != nil && client != nil {
-				startupMsgParams := cast.ToStringMapString(startupMessage["Parameters"])
-				if startupMsgParams != nil {
-					if startupMsgParams["database"] != "" && client["remote"] != "" {
+	// This is used as a fallback if the database is not found in the startup message.
+	database := p.DefaultDBName
+	if database == "" {
+		client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
+		// Try to get the database from the startup message, which is only sent once by the client.
+		// Store the database in the cache so that we can use it for subsequent requests.
+		startupMessageEncoded := cast.ToString(sdkPlugin.GetAttr(req, "startupMessage", ""))
+		if startupMessageEncoded != "" {
+			startupMessageBytes, err := base64.StdEncoding.DecodeString(startupMessageEncoded)
+			if err != nil {
+				p.Logger.Debug("Failed to decode startup message", "error", err)
+			} else {
+				startupMessage := cast.ToStringMap(string(startupMessageBytes))
+				p.Logger.Trace("Startup message", "startupMessage", startupMessage, "client", client)
+				if startupMessage != nil && client != nil {
+					startupMsgParams := cast.ToStringMapString(startupMessage["Parameters"])
+					if startupMsgParams != nil &&
+						startupMsgParams["database"] != "" &&
+						client["remote"] != "" {
 						if err := cacheManager.Set(
 							ctx, client["remote"], startupMsgParams["database"]); err != nil {
 							CacheMissesCounter.Inc()
@@ -104,19 +107,28 @@ func (p *Plugin) OnTrafficFromClient(
 				}
 			}
 		}
+
+		// Get the database from the cache if it's not found in the startup message or
+		// if the current request is not a startup message.
+		if database == "" {
+			database, err = cacheManager.Get(ctx, client["remote"])
+			if err != nil {
+				CacheMissesCounter.Inc()
+				p.Logger.Debug("Failed to get cache", "error", err)
+			}
+			CacheGetsCounter.Inc()
+			p.Logger.Debug("Get the database in the cache for the current session",
+				"database", database, "client", client["remote"])
+		}
 	}
 
-	// Get the database from the cache if it's not found in the startup message or
-	// if the current request is not a startup message.
+	// If the database is still not found, return the response as is without caching.
+	// This might also happen if the cache is cleared while the client is still connected.
+	// In this case, the client should reconnect and the error will go away.
 	if database == "" {
-		database, err = cacheManager.Get(ctx, client["remote"])
-		if err != nil {
-			CacheMissesCounter.Inc()
-			p.Logger.Debug("Failed to get cache", "error", err)
-		}
-		CacheGetsCounter.Inc()
-		p.Logger.Debug("Get the database in the cache for the current session",
-			"database", database, "client", client["remote"])
+		p.Logger.Error(
+			"Database not found in the cache, startup message or plugin config. Skipping cache")
+		return req, nil
 	}
 
 	query := cast.ToString(sdkPlugin.GetAttr(req, "query", ""))
@@ -162,16 +174,28 @@ func (p *Plugin) OnTrafficFromServer(
 	request := cast.ToString(sdkPlugin.GetAttr(resp, "request", ""))
 	response := cast.ToString(sdkPlugin.GetAttr(resp, "response", ""))
 	server := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "server", ""))
-	client := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "client", nil))
 
-	var database string
-	if client != nil && client["remote"] != "" {
-		database, err = cacheManager.Get(ctx, client["remote"])
-		if err != nil {
-			CacheMissesCounter.Inc()
-			p.Logger.Debug("Failed to get cached response", "error", err)
+	// This is used as a fallback if the database is not found in the startup message.
+	database := p.DefaultDBName
+	if database == "" {
+		client := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "client", ""))
+		if client != nil && client["remote"] != "" {
+			database, err = cacheManager.Get(ctx, client["remote"])
+			if err != nil {
+				CacheMissesCounter.Inc()
+				p.Logger.Debug("Failed to get cached response", "error", err)
+			}
+			CacheGetsCounter.Inc()
 		}
-		CacheGetsCounter.Inc()
+	}
+
+	// If the database is still not found, return the response as is without caching.
+	// This might also happen if the cache is cleared while the client is still connected.
+	// In this case, the client should reconnect and the error will go away.
+	if database == "" {
+		p.Logger.Error(
+			"Database not found in the cache, startup message or plugin config. Skipping cache")
+		return resp, nil
 	}
 
 	cacheKey := strings.Join([]string{server["remote"], database, request}, ":")
