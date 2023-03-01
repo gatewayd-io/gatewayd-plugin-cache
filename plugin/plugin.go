@@ -12,6 +12,7 @@ import (
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/databases/postgres"
 	sdkPlugin "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
+	goRedis "github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/spf13/cast"
@@ -24,6 +25,7 @@ type Plugin struct {
 	v1.GatewayDPluginServiceServer
 
 	Logger        hclog.Logger
+	RedisClient   *goRedis.Client
 	RedisStore    *redis.RedisStore
 	RedisURL      string
 	Expiry        time.Duration
