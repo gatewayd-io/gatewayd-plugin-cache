@@ -58,19 +58,22 @@ func (p *CachePlugin) GRPCClient(ctx context.Context, b *goplugin.GRPCBroker, c 
 
 // GetPluginConfig returns the plugin config.
 func (p *Plugin) GetPluginConfig(
-	ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
+	ctx context.Context, req *structpb.Struct,
+) (*structpb.Struct, error) {
 	return structpb.NewStruct(PluginConfig)
 }
 
 // OnConfigLoaded is called when the global config is loaded by GatewayD.
 func (p *Plugin) OnConfigLoaded(
-	ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
+	ctx context.Context, req *structpb.Struct,
+) (*structpb.Struct, error) {
 	return req, nil
 }
 
 // OnTrafficFromClient is called when a request is received by GatewayD from the client.
 func (p *Plugin) OnTrafficFromClient(
-	ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
+	ctx context.Context, req *structpb.Struct,
+) (*structpb.Struct, error) {
 	cacheManager := cache.New[string](p.RedisStore)
 
 	req, err := postgres.HandleClientMessage(req, p.Logger)
@@ -140,6 +143,58 @@ func (p *Plugin) OnTrafficFromClient(
 
 	if query != "" {
 		p.Logger.Trace("Query", "query", query)
+
+		// Check if the query is a UPDATE, INSERT or DELETE.
+		queryDecoded, err := base64.StdEncoding.DecodeString(query)
+		if err != nil {
+			p.Logger.Debug("Failed to decode query", "error", err)
+		} else {
+			queryMessage := cast.ToStringMapString(string(queryDecoded))
+			p.Logger.Trace("Query message", "query", queryMessage)
+
+			if strings.HasPrefix(strings.ToUpper(queryMessage["String"]), "UPDATE") ||
+				strings.HasPrefix(strings.ToUpper(queryMessage["String"]), "INSERT") ||
+				strings.HasPrefix(strings.ToUpper(queryMessage["String"]), "DELETE") {
+				tables, err := GetTablesFromQuery(queryMessage["String"])
+
+				if err != nil {
+					p.Logger.Debug("Failed to get tables from query", "error", err)
+				} else {
+					p.Logger.Trace("Tables", "tables", tables)
+					for _, table := range tables {
+						// Invalidate the cache for the table.
+						// TODO: This is not efficient. We should be able to invalidate the cache
+						// for a specific key instead of invalidating the entire table.
+						keys := p.RedisClient.Keys(ctx, table+":*")
+						if keys.Err() != nil {
+							CacheMissesCounter.Inc()
+							p.Logger.Debug("Failed to get keys", "error", keys.Err())
+						}
+
+						// Per each key, delete the cache entry and the table cache key itself.
+						for _, key := range keys.Val() {
+							// Invalidate the cache for the table.
+							cachedRespnseKey := strings.TrimPrefix(key, table+":")
+							if err := cacheManager.Delete(ctx, cachedRespnseKey); err != nil {
+								CacheMissesCounter.Inc()
+								p.Logger.Debug("Failed to delete cached response", "error", err)
+							}
+							CacheDeletesCounter.Inc()
+							p.Logger.Debug("Deleted cached response", "key", key)
+
+							// Invalidate the table cache key itself.
+							if err := cacheManager.Delete(ctx, key); err != nil {
+								CacheMissesCounter.Inc()
+								p.Logger.Debug("Failed to delete cached response", "error", err)
+							}
+							CacheDeletesCounter.Inc()
+							p.Logger.Debug("Deleted cached response", "key", key)
+						}
+					}
+				}
+			}
+		}
+
 		response, err := cacheManager.Get(ctx, cacheKey)
 		if err != nil {
 			CacheMissesCounter.Inc()
@@ -162,7 +217,8 @@ func (p *Plugin) OnTrafficFromClient(
 
 // OnTrafficFromServer is called when a response is received by GatewayD from the server.
 func (p *Plugin) OnTrafficFromServer(
-	ctx context.Context, resp *structpb.Struct) (*structpb.Struct, error) {
+	ctx context.Context, resp *structpb.Struct,
+) (*structpb.Struct, error) {
 	cacheManager := cache.New[string](p.RedisStore)
 
 	resp, err := postgres.HandleServerMessage(resp, p.Logger)
@@ -209,11 +265,35 @@ func (p *Plugin) OnTrafficFromServer(
 	}
 
 	if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
+		// The request was successful and the response contains data. Cache the response.
 		if err := cacheManager.Set(ctx, cacheKey, response, options...); err != nil {
 			CacheMissesCounter.Inc()
 			p.Logger.Debug("Failed to set cache", "error", err)
 		}
 		CacheSetsCounter.Inc()
+
+		// Cache the query as well.
+		query, err := GetQueryFromRequest(request)
+		if err != nil {
+			p.Logger.Debug("Failed to get query from request", "error", err)
+		} else {
+			tables, err := GetTablesFromQuery(query)
+			if err != nil {
+				p.Logger.Debug("Failed to get tables from query", "error", err)
+			} else {
+				// Cache the table(s) used in each cached request. This is used to invalidate
+				// the cache when a rows is inserted, updated or deleted into that table.
+				for _, table := range tables {
+					requestQueryCacheKey := strings.Join([]string{table, cacheKey}, ":")
+					if err := cacheManager.Set(
+						ctx, requestQueryCacheKey, "", options...); err != nil {
+						CacheMissesCounter.Inc()
+						p.Logger.Debug("Failed to set cache", "error", err)
+					}
+					CacheSetsCounter.Inc()
+				}
+			}
+		}
 	}
 
 	return resp, nil
