@@ -4,7 +4,7 @@ import (
 	"flag"
 	"os"
 
-	redis_store "github.com/eko/gocache/store/redis/v4"
+	redisStore "github.com/eko/gocache/store/redis/v4"
 	"github.com/gatewayd-io/gatewayd-plugin-cache/plugin"
 	sdkConfig "github.com/gatewayd-io/gatewayd-plugin-sdk/config"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
@@ -48,8 +48,9 @@ func main() {
 			os.Exit(1)
 		}
 
-		pluginInstance.Impl.RedisStore = redis_store.NewRedis(
-			redis.NewClient(redisConfig),
+		pluginInstance.Impl.RedisClient = redis.NewClient(redisConfig)
+		pluginInstance.Impl.RedisStore = redisStore.NewRedis(
+			pluginInstance.Impl.RedisClient,
 		)
 	}
 
