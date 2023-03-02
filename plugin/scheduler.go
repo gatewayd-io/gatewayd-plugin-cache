@@ -22,10 +22,11 @@ func (p *Plugin) PeriodicInvalidator(interval, delay time.Duration) {
 		}
 	}); err != nil {
 		p.Logger.Error("Failed to start periodic invalidator",
-			"error", err, "interval", interval, "delay", delay)
+			"error", err, "interval", interval.String(), "delay", delay.String())
 		return
 	}
 
 	scheduler.StartAsync()
-	p.Logger.Debug("Started periodic invalidator", "interval", interval, "delay", delay)
+	p.Logger.Debug("Started periodic invalidator",
+		"interval", interval.String(), "delay", delay.String())
 }
