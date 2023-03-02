@@ -52,6 +52,21 @@ func main() {
 		pluginInstance.Impl.RedisStore = redisStore.NewRedis(
 			pluginInstance.Impl.RedisClient,
 		)
+
+		pluginInstance.Impl.PeriodicInvalidatorEnabled = cast.ToBool(
+			cfg["periodicInvalidatorEnabled"])
+		pluginInstance.Impl.PeriodicInvalidatorStartDelay = cast.ToDuration(
+			cfg["periodicInvalidatorStartDelay"])
+		pluginInstance.Impl.PeriodicInvalidatorInterval = cast.ToDuration(
+			cfg["periodicInvalidatorInterval"])
+
+		// Start the periodic invalidator.
+		if pluginInstance.Impl.PeriodicInvalidatorEnabled {
+			pluginInstance.Impl.PeriodicInvalidator(
+				pluginInstance.Impl.PeriodicInvalidatorInterval,
+				pluginInstance.Impl.PeriodicInvalidatorStartDelay,
+			)
+		}
 	}
 
 	goplugin.Serve(&goplugin.ServeConfig{

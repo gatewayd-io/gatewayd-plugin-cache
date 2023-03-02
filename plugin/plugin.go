@@ -24,12 +24,19 @@ type Plugin struct {
 	goplugin.GRPCPlugin
 	v1.GatewayDPluginServiceServer
 
-	Logger        hclog.Logger
+	Logger hclog.Logger
+
+	// Cache configuration.
 	RedisClient   *goRedis.Client
 	RedisStore    *redis.RedisStore
 	RedisURL      string
 	Expiry        time.Duration
 	DefaultDBName string
+
+	// Periodic invalidator configuration.
+	PeriodicInvalidatorEnabled    bool
+	PeriodicInvalidatorStartDelay time.Duration
+	PeriodicInvalidatorInterval   time.Duration
 }
 
 type CachePlugin struct {
