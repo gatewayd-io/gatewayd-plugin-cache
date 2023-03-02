@@ -11,7 +11,7 @@ func (p *Plugin) PeriodicInvalidator(interval, delay time.Duration) {
 	scheduler := gocron.NewScheduler(time.UTC)
 	startDelay := time.Now().Add(delay)
 
-	if _, err := scheduler.Every(interval).SingletonMode().At(startDelay).Do(func() {
+	if _, err := scheduler.Every(interval).SingletonMode().StartAt(startDelay).Do(func() {
 		// TODO: Get list of valid keys from GatewayD and bypass those.
 		for _, key := range p.RedisClient.Keys(context.Background(), "*:*").Val() {
 			if validateAddressPort(key) || validateHostPort(key) {
@@ -21,9 +21,11 @@ func (p *Plugin) PeriodicInvalidator(interval, delay time.Duration) {
 			}
 		}
 	}); err != nil {
-		p.Logger.Error("Failed to start periodic invalidator", "error", err)
+		p.Logger.Error("Failed to start periodic invalidator",
+			"error", err, "interval", interval, "delay", delay)
 		return
 	}
 
 	scheduler.StartAsync()
+	p.Logger.Debug("Started periodic invalidator", "interval", interval, "delay", delay)
 }
