@@ -37,7 +37,7 @@ func GetTablesFromQuery(query string) ([]string, error) {
 		return nil, nil
 	}
 
-	var tables []string
+	tables := []string{}
 
 	for _, stmt := range stmt.Stmts {
 		if stmt.Stmt.GetSelectStmt() != nil {

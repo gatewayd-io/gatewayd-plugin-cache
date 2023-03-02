@@ -258,7 +258,7 @@ func (p *Plugin) OnTrafficFromServer(
 
 	cacheKey := strings.Join([]string{server["remote"], database, request}, ":")
 
-	var options []store.Option
+	options := []store.Option{}
 	if p.Expiry.Seconds() > 0 {
 		p.Logger.Debug("Key expiry is set", "expiry", p.Expiry)
 		options = append(options, store.WithExpiration(p.Expiry))
