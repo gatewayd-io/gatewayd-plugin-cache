@@ -40,22 +40,25 @@ func GetTablesFromQuery(query string) ([]string, error) {
 	tables := []string{}
 
 	for _, stmt := range stmt.Stmts {
-		if stmt.Stmt.GetSelectStmt() != nil {
-			for _, fromClause := range stmt.Stmt.GetSelectStmt().FromClause {
-				tables = append(tables, fromClause.GetRangeVar().Relname)
+		if selectQuery := stmt.Stmt.GetSelectStmt(); selectQuery != nil {
+			for _, fromClause := range selectQuery.FromClause {
+				rangeVar := fromClause.GetRangeVar()
+				if rangeVar != nil {
+					tables = append(tables, rangeVar.Relname)
+				}
 			}
 		}
 
-		if stmt.Stmt.GetInsertStmt() != nil {
-			tables = append(tables, stmt.Stmt.GetInsertStmt().Relation.Relname)
+		if insertQuery := stmt.Stmt.GetInsertStmt(); insertQuery != nil {
+			tables = append(tables, insertQuery.Relation.Relname)
 		}
 
-		if stmt.Stmt.GetUpdateStmt() != nil {
-			tables = append(tables, stmt.Stmt.GetUpdateStmt().Relation.Relname)
+		if updateQuery := stmt.Stmt.GetUpdateStmt(); updateQuery != nil {
+			tables = append(tables, updateQuery.Relation.Relname)
 		}
 
-		if stmt.Stmt.GetDeleteStmt() != nil {
-			tables = append(tables, stmt.Stmt.GetDeleteStmt().Relation.Relname)
+		if deleteQuery := stmt.Stmt.GetDeleteStmt(); deleteQuery != nil {
+			tables = append(tables, deleteQuery.Relation.Relname)
 		}
 	}
 
