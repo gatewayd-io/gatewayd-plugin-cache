@@ -2,6 +2,9 @@ package plugin
 
 import (
 	"encoding/base64"
+	"net"
+	"strconv"
+	"strings"
 
 	pgQuery "github.com/pganalyze/pg_query_go/v2"
 )
@@ -60,4 +63,43 @@ func GetTablesFromQuery(query string) ([]string, error) {
 	}
 
 	return tables, nil
+}
+
+// validateAddressPort validates an address:port string.
+func validateAddressPort(addressPort string) bool {
+	data := strings.Split(addressPort, ":")
+	if len(data) != 2 {
+		return false
+	}
+
+	port, err := strconv.ParseUint(data[1], 10, 16)
+	if err != nil {
+		return false
+	}
+
+	if net.ParseIP(data[0]) != nil && (port > 0 && port <= 65535) {
+		return true
+	}
+
+	return false
+}
+
+// validateHostPort validates a host:port string.
+func validateHostPort(hostPort string) bool {
+	data := strings.Split(hostPort, ":")
+	if len(data) != 2 {
+		return false
+	}
+
+	port, err := strconv.ParseUint(data[1], 10, 16)
+	if err != nil {
+		return false
+	}
+
+	// FIXME: There is not much to validate on the host side.
+	if data[0] != "" && port > 0 && port <= 65535 {
+		return true
+	}
+
+	return false
 }
