@@ -159,9 +159,12 @@ func (p *Plugin) OnTrafficFromClient(
 			queryMessage := cast.ToStringMapString(string(queryDecoded))
 			p.Logger.Trace("Query message", "query", queryMessage)
 
-			if strings.HasPrefix(strings.ToUpper(queryMessage["String"]), "UPDATE") ||
-				strings.HasPrefix(strings.ToUpper(queryMessage["String"]), "INSERT") ||
-				strings.HasPrefix(strings.ToUpper(queryMessage["String"]), "DELETE") {
+			queryString := strings.ToUpper(queryMessage["String"])
+			// TODO: Add change detection for all changes to DB, not just for the DMLs.
+			// https://github.com/gatewayd-io/gatewayd-plugin-cache/issues/19
+			if strings.HasPrefix(queryString, "UPDATE") ||
+				strings.HasPrefix(queryString, "INSERT") ||
+				strings.HasPrefix(queryString, "DELETE") {
 				tables, err := GetTablesFromQuery(queryMessage["String"])
 
 				if err != nil {
