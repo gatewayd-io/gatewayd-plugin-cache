@@ -37,6 +37,7 @@ type Plugin struct {
 	PeriodicInvalidatorEnabled    bool
 	PeriodicInvalidatorStartDelay time.Duration
 	PeriodicInvalidatorInterval   time.Duration
+	APIAddress                    string
 }
 
 type CachePlugin struct {

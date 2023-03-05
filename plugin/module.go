@@ -42,6 +42,7 @@ var (
 				"PERIODIC_INVALIDATOR_START_DELAY", "1m"),
 			"periodicInvalidatorInterval": sdkConfig.GetEnv(
 				"PERIODIC_INVALIDATOR_INTERVAL", "1m"),
+			"apiAddress": sdkConfig.GetEnv("API_ADDRESS", "localhost:8080"),
 		},
 		"hooks": []interface{}{
 			"onConfigLoaded",

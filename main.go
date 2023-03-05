@@ -59,13 +59,11 @@ func main() {
 			cfg["periodicInvalidatorStartDelay"])
 		pluginInstance.Impl.PeriodicInvalidatorInterval = cast.ToDuration(
 			cfg["periodicInvalidatorInterval"])
+		pluginInstance.Impl.APIAddress = cast.ToString(cfg["apiAddress"])
 
 		// Start the periodic invalidator.
 		if pluginInstance.Impl.PeriodicInvalidatorEnabled {
-			pluginInstance.Impl.PeriodicInvalidator(
-				pluginInstance.Impl.PeriodicInvalidatorInterval,
-				pluginInstance.Impl.PeriodicInvalidatorStartDelay,
-			)
+			pluginInstance.Impl.PeriodicInvalidator()
 		}
 	}
 
