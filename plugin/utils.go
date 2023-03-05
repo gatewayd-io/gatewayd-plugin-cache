@@ -45,7 +45,9 @@ func GetTablesFromQuery(query string) ([]string, error) {
 	for _, stmt := range stmt.Stmts {
 		if stmt.Stmt.GetSelectStmt() != nil {
 			for _, fromClause := range stmt.Stmt.GetSelectStmt().FromClause {
-				tables = append(tables, fromClause.GetRangeVar().Relname)
+				if fromClause.GetRangeVar() != nil {
+					tables = append(tables, fromClause.GetRangeVar().Relname)
+				}
 			}
 		}
 
