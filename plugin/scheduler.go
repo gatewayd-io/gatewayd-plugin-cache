@@ -7,26 +7,43 @@ import (
 	"github.com/go-co-op/gocron"
 )
 
-func (p *Plugin) PeriodicInvalidator(interval, delay time.Duration) {
+// PeriodicInvalidator is a function that runs periodically and deletes all the
+// cached client keys that are not valid anymore. This has two purposes:
+// 1. If a client is not connected to the GatewayD anymore, it will be deleted.
+// 2. Invalidate stale keys for responses. (This is not implemented yet.)
+// https://github.com/gatewayd-io/gatewayd-plugin-cache/issues/4
+func (p *Plugin) PeriodicInvalidator() {
 	scheduler := gocron.NewScheduler(time.UTC)
-	startDelay := time.Now().Add(delay)
+	startDelay := time.Now().Add(p.PeriodicInvalidatorStartDelay)
 
-	if _, err := scheduler.Every(interval).SingletonMode().StartAt(startDelay).Do(func() {
-		// TODO: Get list of valid keys from GatewayD and bypass those.
-		for _, key := range p.RedisClient.Keys(context.Background(), "*:*").Val() {
-			if validateAddressPort(key) || validateHostPort(key) {
-				p.RedisClient.Del(context.Background(), key)
-				p.Logger.Debug("Deleted key", "key", key)
+	if _, err := scheduler.Every(p.PeriodicInvalidatorInterval).SingletonMode().StartAt(startDelay).Do(func() {
+		proxies := p.getProxies()
+		p.Logger.Trace("Got proxies from GatewayD", "proxies", proxies)
+
+		// Get all the client keys and delete the ones that are not valid.
+		for _, address := range p.RedisClient.Keys(context.Background(), "*:*").Val() {
+			if validateAddressPort(address) || validateHostPort(address) {
+				// If the connection is busy, it is not safe to delete the key.
+				if isBusy(proxies, address) {
+					p.Logger.Trace("Skipping connection because it is busy", "address", address)
+					continue
+				}
+
+				p.RedisClient.Del(context.Background(), address)
+				p.Logger.Trace("Deleted address", "address", address)
 				CacheDeletesCounter.Inc()
 			}
 		}
 	}); err != nil {
 		p.Logger.Error("Failed to start periodic invalidator",
-			"error", err, "interval", interval.String(), "delay", delay.String())
+			"error", err,
+			"interval", p.PeriodicInvalidatorInterval.String(),
+			"delay", p.PeriodicInvalidatorStartDelay.String())
 		return
 	}
 
 	scheduler.StartAsync()
 	p.Logger.Debug("Started periodic invalidator",
-		"interval", interval.String(), "delay", delay.String())
+		"interval", p.PeriodicInvalidatorInterval.String(),
+		"delay", p.PeriodicInvalidatorStartDelay.String())
 }

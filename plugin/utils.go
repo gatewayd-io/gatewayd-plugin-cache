@@ -105,3 +105,16 @@ func validateHostPort(hostPort string) bool {
 
 	return false
 }
+
+// isBusy checks if a client address exists in cache by matching the address
+// with the busy clients.
+func isBusy(proxies map[string]Proxy, address string) bool {
+	for _, name := range proxies {
+		for _, client := range name.Busy {
+			if client == address {
+				return true
+			}
+		}
+	}
+	return false
+}
