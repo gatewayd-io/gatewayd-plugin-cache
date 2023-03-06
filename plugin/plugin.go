@@ -133,7 +133,8 @@ func (p *Plugin) OnTrafficFromClient(
 	// In this case, the client should reconnect and the error will go away.
 	if database == "" {
 		p.Logger.Error(
-			"Database not found in the cache, startup message or plugin config. Skipping cache")
+			"Database name not found or set in cache, startup message or plugin config. Skipping cache")
+		p.Logger.Error("Consider setting the database name in the plugin config or disabling the plugin if you don't need it")
 		return req, nil
 	}
 
@@ -256,7 +257,8 @@ func (p *Plugin) OnTrafficFromServer(
 	// In this case, the client should reconnect and the error will go away.
 	if database == "" {
 		p.Logger.Error(
-			"Database not found in the cache, startup message or plugin config. Skipping cache")
+			"Database name not found or set in cache, startup message or plugin config. Skipping cache")
+		p.Logger.Error("Consider setting the database name in the plugin config or disabling the plugin if you don't need it")
 		return resp, nil
 	}
 
