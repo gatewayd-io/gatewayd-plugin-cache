@@ -71,13 +71,6 @@ func (p *Plugin) GetPluginConfig(
 	return structpb.NewStruct(PluginConfig)
 }
 
-// OnConfigLoaded is called when the global config is loaded by GatewayD.
-func (p *Plugin) OnConfigLoaded(
-	ctx context.Context, req *structpb.Struct,
-) (*structpb.Struct, error) {
-	return req, nil
-}
-
 // OnTrafficFromClient is called when a request is received by GatewayD from the client.
 func (p *Plugin) OnTrafficFromClient(
 	ctx context.Context, req *structpb.Struct,

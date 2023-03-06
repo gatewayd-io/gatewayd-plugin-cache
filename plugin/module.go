@@ -45,7 +45,6 @@ var (
 			"apiAddress": sdkConfig.GetEnv("API_ADDRESS", "localhost:8080"),
 		},
 		"hooks": []interface{}{
-			"onConfigLoaded",
 			"onTrafficFromClient",
 			"onTrafficFromServer",
 			"onClosed",
