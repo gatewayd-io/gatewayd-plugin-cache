@@ -45,9 +45,9 @@ var (
 			"apiAddress": sdkConfig.GetEnv("API_ADDRESS", "localhost:8080"),
 		},
 		"hooks": []interface{}{
-			"onTrafficFromClient",
-			"onTrafficFromServer",
-			"onClosed",
+			v1.HookName_HOOK_NAME_ON_CLOSED,
+			v1.HookName_HOOK_NAME_ON_TRAFFIC_FROM_CLIENT,
+			v1.HookName_HOOK_NAME_ON_TRAFFIC_FROM_SERVER,
 		},
 		"tags":       []interface{}{"plugin", "cache", "redis", "postgres"},
 		"categories": []interface{}{"builtin", "cache", "redis", "postgres"},
