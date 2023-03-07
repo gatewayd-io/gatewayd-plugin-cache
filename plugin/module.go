@@ -25,7 +25,7 @@ var (
 		"authors": []interface{}{
 			"Mostafa Moradian <mostafa@gatewayd.io>",
 		},
-		"license":    "Apache-2.0",
+		"license":    "AGPL-3.0",
 		"projectUrl": "https://github.com/gatewayd-io/gatewayd-plugin-cache",
 		// Compile-time configuration
 		"config": map[string]interface{}{
@@ -45,9 +45,9 @@ var (
 			"apiAddress": sdkConfig.GetEnv("API_ADDRESS", "localhost:8080"),
 		},
 		"hooks": []interface{}{
-			v1.HookName_HOOK_NAME_ON_CLOSED,
-			v1.HookName_HOOK_NAME_ON_TRAFFIC_FROM_CLIENT,
-			v1.HookName_HOOK_NAME_ON_TRAFFIC_FROM_SERVER,
+			int32(v1.HookName_HOOK_NAME_ON_CLOSED),
+			int32(v1.HookName_HOOK_NAME_ON_TRAFFIC_FROM_CLIENT),
+			int32(v1.HookName_HOOK_NAME_ON_TRAFFIC_FROM_SERVER),
 		},
 		"tags":       []interface{}{"plugin", "cache", "redis", "postgres"},
 		"categories": []interface{}{"builtin", "cache", "redis", "postgres"},
