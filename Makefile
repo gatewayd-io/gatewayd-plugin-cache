@@ -3,3 +3,6 @@ build:
 
 checksum:
 	sha256sum -b gatewayd-plugin-cache
+
+update-all:
+	go get -u ./...
