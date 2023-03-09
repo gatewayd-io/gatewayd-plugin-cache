@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -50,6 +51,14 @@ func main() {
 		}
 
 		pluginInstance.Impl.RedisClient = redis.NewClient(redisConfig)
+
+		// Ping the Redis server to check if it is available.
+		_, err = pluginInstance.Impl.RedisClient.Ping(context.Background()).Result()
+		if err != nil {
+			logger.Error("Failed to ping Redis server", "error", err)
+			os.Exit(1)
+		}
+
 		pluginInstance.Impl.RedisStore = redisStore.NewRedis(
 			pluginInstance.Impl.RedisClient,
 		)
