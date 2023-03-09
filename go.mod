@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/eko/gocache/lib/v4 v4.1.3
 	github.com/eko/gocache/store/redis/v4 v4.1.2
-	github.com/gatewayd-io/gatewayd-plugin-sdk v0.0.15
+	github.com/gatewayd-io/gatewayd-plugin-sdk v0.0.16
 	github.com/go-co-op/gocron v1.18.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/hashicorp/go-hclog v1.4.0
