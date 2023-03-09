@@ -9,6 +9,7 @@ import (
 	sdkConfig "github.com/gatewayd-io/gatewayd-plugin-sdk/config"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/metrics"
+	p "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
@@ -76,7 +77,7 @@ func main() {
 		Plugins: goplugin.PluginSet{
 			plugin.PluginID.Name: pluginInstance,
 		},
-		GRPCServer: goplugin.DefaultGRPCServer,
+		GRPCServer: p.DefaultGRPCServer,
 		Logger:     logger,
 	})
 }
