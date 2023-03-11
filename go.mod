@@ -1,6 +1,6 @@
 module github.com/gatewayd-io/gatewayd-plugin-cache
 
-go 1.19
+go 1.20
 
 require (
 	github.com/eko/gocache/lib/v4 v4.1.3
