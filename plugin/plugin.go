@@ -131,7 +131,10 @@ func (p *Plugin) OnTrafficFromClient(
 	// If the database is still not found, return the response as is without caching.
 	// This might also happen if the cache is cleared while the client is still connected.
 	// In this case, the client should reconnect and the error will go away.
-	if database == "" {
+	preconditions := sdkPlugin.GetAttr(req, "sslRequest", "") != "" ||
+		sdkPlugin.GetAttr(req, "saslInitialResponse", "") != "" ||
+		sdkPlugin.GetAttr(req, "cancelRequest", "") != ""
+	if database == "" && !preconditions {
 		p.Logger.Error(
 			"Database name not found or set in cache, startup message or plugin config. Skipping cache")
 		p.Logger.Error("Consider setting the database name in the plugin config or disabling the plugin if you don't need it")
