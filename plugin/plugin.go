@@ -13,6 +13,7 @@ import (
 	sdkPlugin "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	goRedis "github.com/go-redis/redis/v8"
+	"github.com/golang/snappy"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/spf13/cast"
@@ -212,10 +213,16 @@ func (p *Plugin) OnTrafficFromClient(
 
 		if response != "" {
 			CacheHitsCounter.Inc()
+			// Decompress the response from Snappy.
+			responseDecompressed, err := snappy.Decode(nil, []byte(response))
+			if err != nil {
+				p.Logger.Debug("Failed to decompress cached response", "error", err)
+				return req, nil
+			}
 			// The response is cached.
 			return structpb.NewStruct(map[string]interface{}{
 				"terminate": true,
-				"response":  response,
+				"response":  string(responseDecompressed),
 			})
 		}
 	}
@@ -273,8 +280,11 @@ func (p *Plugin) OnTrafficFromServer(
 	}
 
 	if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
+		// Compress the response with Snappy.
+		compressedResponse := snappy.Encode(nil, []byte(response))
 		// The request was successful and the response contains data. Cache the response.
-		if err := cacheManager.Set(ctx, cacheKey, response, options...); err != nil {
+		if err := cacheManager.Set(
+			ctx, cacheKey, string(compressedResponse), options...); err != nil {
 			CacheMissesCounter.Inc()
 			p.Logger.Debug("Failed to set cache", "error", err)
 		}

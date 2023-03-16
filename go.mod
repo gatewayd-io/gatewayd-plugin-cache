@@ -8,6 +8,7 @@ require (
 	github.com/gatewayd-io/gatewayd-plugin-sdk v0.0.16
 	github.com/go-co-op/gocron v1.18.1
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/golang/snappy v0.0.4
 	github.com/hashicorp/go-hclog v1.4.0
 	github.com/hashicorp/go-plugin v1.4.9
 	github.com/pganalyze/pg_query_go/v2 v2.2.0
