@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"context"
-	"encoding/base64"
 	"strings"
 	"time"
 
@@ -87,33 +86,7 @@ func (p *Plugin) OnTrafficFromClient(
 	database := p.DefaultDBName
 	if database == "" {
 		client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
-		// Try to get the database from the startup message, which is only sent once by the client.
-		// Store the database in the cache so that we can use it for subsequent requests.
-		startupMessageEncoded := cast.ToString(sdkPlugin.GetAttr(req, "startupMessage", ""))
-		if startupMessageEncoded != "" {
-			startupMessageBytes, err := base64.StdEncoding.DecodeString(startupMessageEncoded)
-			if err != nil {
-				p.Logger.Debug("Failed to decode startup message", "error", err)
-			} else {
-				startupMessage := cast.ToStringMap(string(startupMessageBytes))
-				p.Logger.Trace("Startup message", "startupMessage", startupMessage, "client", client)
-				if startupMessage != nil && client != nil {
-					startupMsgParams := cast.ToStringMapString(startupMessage["Parameters"])
-					if startupMsgParams != nil &&
-						startupMsgParams["database"] != "" &&
-						client["remote"] != "" {
-						if err := cacheManager.Set(
-							ctx, client["remote"], startupMsgParams["database"]); err != nil {
-							CacheMissesCounter.Inc()
-							p.Logger.Debug("Failed to set cache", "error", err)
-						}
-						CacheSetsCounter.Inc()
-						p.Logger.Debug("Set the database in the cache for the current session",
-							"database", database, "client", client["remote"])
-					}
-				}
-			}
-		}
+		database := p.getDBFromStartupMessage(req, cacheManager, database, client)
 
 		// Get the database from the cache if it's not found in the startup message or
 		// if the current request is not a startup message.
@@ -150,71 +123,10 @@ func (p *Plugin) OnTrafficFromClient(
 	if query != "" {
 		p.Logger.Trace("Query", "query", query)
 
-		// Check if the query is a UPDATE, INSERT or DELETE.
-		queryDecoded, err := base64.StdEncoding.DecodeString(query)
-		if err != nil {
-			p.Logger.Debug("Failed to decode query", "error", err)
-		} else {
-			queryMessage := cast.ToStringMapString(string(queryDecoded))
-			p.Logger.Trace("Query message", "query", queryMessage)
+		// Clear the cache if the query is an insert, update or delete query.
+		p.invalidateDML(query)
 
-			queryString := strings.ToUpper(queryMessage["String"])
-			// TODO: Add change detection for all changes to DB, not just for the DMLs.
-			// https://github.com/gatewayd-io/gatewayd-plugin-cache/issues/19
-			if strings.HasPrefix(queryString, "UPDATE") ||
-				strings.HasPrefix(queryString, "INSERT") ||
-				strings.HasPrefix(queryString, "DELETE") {
-				tables, err := GetTablesFromQuery(queryMessage["String"])
-
-				if err != nil {
-					p.Logger.Debug("Failed to get tables from query", "error", err)
-				} else {
-					p.Logger.Trace("Tables", "tables", tables)
-					for _, table := range tables {
-						// Invalidate the cache for the table.
-						// TODO: This is not efficient. We should be able to invalidate the cache
-						// for a specific key instead of invalidating the entire table.
-						pipeline := p.RedisClient.Pipeline()
-						for {
-							scanResult := p.RedisClient.Scan(ctx, 0, table+":*", p.ScanCount)
-							if scanResult.Err() != nil {
-								CacheMissesCounter.Inc()
-								p.Logger.Debug("Failed to scan keys", "error", scanResult.Err())
-								break
-							}
-
-							// Per each key, delete the cache entry and the table cache key itself.
-							keys, cursor := scanResult.Val()
-							for _, tableKey := range keys {
-								// Invalidate the cache for the table.
-								cachedRespnseKey := strings.TrimPrefix(tableKey, table+":")
-								pipeline.Del(ctx, cachedRespnseKey)
-								// Invalidate the table cache key itself.
-								pipeline.Del(ctx, tableKey)
-							}
-
-							if cursor == 0 {
-								break
-							}
-						}
-
-						result, err := pipeline.Exec(ctx)
-						if err != nil {
-							p.Logger.Debug("Failed to execute pipeline", "error", err)
-						}
-
-						for _, res := range result {
-							if res.Err() != nil {
-								CacheMissesCounter.Inc()
-							} else {
-								CacheDeletesCounter.Inc()
-							}
-						}
-					}
-				}
-			}
-		}
-
+		// Check if the query is cached.
 		response, err := cacheManager.Get(ctx, cacheKey)
 		if err != nil {
 			CacheMissesCounter.Inc()
@@ -222,6 +134,7 @@ func (p *Plugin) OnTrafficFromClient(
 		}
 		CacheGetsCounter.Inc()
 
+		// If the query is cached, return the cached response.
 		if response != "" {
 			CacheHitsCounter.Inc()
 			// The response is cached.
