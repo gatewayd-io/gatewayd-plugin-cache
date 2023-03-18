@@ -36,6 +36,7 @@ var (
 			"redisURL":        sdkConfig.GetEnv("REDIS_URL", "redis://localhost:6379/0"),
 			"expiry":          sdkConfig.GetEnv("EXPIRY", "1h"),
 			"defaultDBName":   sdkConfig.GetEnv("DEFAULT_DB_NAME", ""),
+			"scanCount":       sdkConfig.GetEnv("SCAN_COUNT", "1000"),
 			"periodicInvalidatorEnabled": sdkConfig.GetEnv(
 				"PERIODIC_INVALIDATOR_ENABLED", "true"),
 			"periodicInvalidatorStartDelay": sdkConfig.GetEnv(

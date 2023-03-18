@@ -43,6 +43,7 @@ func main() {
 		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
 		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
 		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
+		pluginInstance.Impl.ScanCount = cast.ToInt64(cfg["scanCount"])
 
 		redisConfig, err := redis.ParseURL(pluginInstance.Impl.RedisURL)
 		if err != nil {
