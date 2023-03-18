@@ -32,6 +32,7 @@ type Plugin struct {
 	RedisURL      string
 	Expiry        time.Duration
 	DefaultDBName string
+	ScanCount     int64
 
 	// Periodic invalidator configuration.
 	PeriodicInvalidatorEnabled    bool
@@ -173,30 +174,41 @@ func (p *Plugin) OnTrafficFromClient(
 						// Invalidate the cache for the table.
 						// TODO: This is not efficient. We should be able to invalidate the cache
 						// for a specific key instead of invalidating the entire table.
-						keys := p.RedisClient.Keys(ctx, table+":*")
-						if keys.Err() != nil {
-							CacheMissesCounter.Inc()
-							p.Logger.Debug("Failed to get keys", "error", keys.Err())
+						pipeline := p.RedisClient.Pipeline()
+						for {
+							scanResult := p.RedisClient.Scan(ctx, 0, table+":*", p.ScanCount)
+							if scanResult.Err() != nil {
+								CacheMissesCounter.Inc()
+								p.Logger.Debug("Failed to scan keys", "error", scanResult.Err())
+								break
+							}
+
+							// Per each key, delete the cache entry and the table cache key itself.
+							keys, cursor := scanResult.Val()
+							for _, tableKey := range keys {
+								// Invalidate the cache for the table.
+								cachedRespnseKey := strings.TrimPrefix(tableKey, table+":")
+								pipeline.Del(ctx, cachedRespnseKey)
+								// Invalidate the table cache key itself.
+								pipeline.Del(ctx, tableKey)
+							}
+
+							if cursor == 0 {
+								break
+							}
 						}
 
-						// Per each key, delete the cache entry and the table cache key itself.
-						for _, key := range keys.Val() {
-							// Invalidate the cache for the table.
-							cachedRespnseKey := strings.TrimPrefix(key, table+":")
-							if err := cacheManager.Delete(ctx, cachedRespnseKey); err != nil {
-								CacheMissesCounter.Inc()
-								p.Logger.Debug("Failed to delete cached response", "error", err)
-							}
-							CacheDeletesCounter.Inc()
-							p.Logger.Debug("Deleted cached response", "key", key)
+						result, err := pipeline.Exec(ctx)
+						if err != nil {
+							p.Logger.Debug("Failed to execute pipeline", "error", err)
+						}
 
-							// Invalidate the table cache key itself.
-							if err := cacheManager.Delete(ctx, key); err != nil {
+						for _, res := range result {
+							if res.Err() != nil {
 								CacheMissesCounter.Inc()
-								p.Logger.Debug("Failed to delete cached response", "error", err)
+							} else {
+								CacheDeletesCounter.Inc()
 							}
-							CacheDeletesCounter.Inc()
-							p.Logger.Debug("Deleted cached response", "key", key)
 						}
 					}
 				}
