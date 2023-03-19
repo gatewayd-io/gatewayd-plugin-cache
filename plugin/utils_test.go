@@ -2,23 +2,21 @@ package plugin
 
 import (
 	"encoding/base64"
-	"encoding/binary"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_GetQueryFromRequest(t *testing.T) {
+func testQueryRequest() (string, string) {
 	query := "SELECT * FROM users"
-	// Get the size of the query and add 5 for the message type and size.
-	size := int32(len(query) + 5)
-	sizeBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(sizeBytes, uint32(size))
-	data := append([]byte("Q"), sizeBytes...)
-	data = append(data, []byte(query)...)
+	queryMsg := pgproto3.Query{String: query}
 	// Encode the data to base64.
-	request := base64.StdEncoding.EncodeToString(data)
+	return query, base64.StdEncoding.EncodeToString(queryMsg.Encode(nil))
+}
 
+func Test_GetQueryFromRequest(t *testing.T) {
+	query, request := testQueryRequest()
 	// Decode the request and extract the query.
 	decodedQuery, err := GetQueryFromRequest(request)
 	assert.Nil(t, err)
