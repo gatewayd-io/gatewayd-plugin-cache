@@ -9,6 +9,7 @@ GatewayD plugin for caching query results.
 - Periodic cache invalidation
 - Support for setting expiry time on cached data
 - Support for caching responses from multiple databases on multiple servers
+- Support nested queries: joins, unions, multi-table selects, and the like
 - Detect client's chosen database from the client's startup message
 - Metrics for quantifying cache hits, misses, gets, sets and deletes
 - Logging at various levels
