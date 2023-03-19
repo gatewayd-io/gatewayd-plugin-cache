@@ -241,3 +241,17 @@ func Test_GetTablesFromQuery_DeleteMultiple(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"users", "comments"}, tables)
 }
+
+func Test_validateAddressPort_Hostname(t *testing.T) {
+	assert.True(t, validateAddressPort("localhost:5432"))
+	assert.True(t, validateAddressPort("	localhost:5432"))
+	assert.True(t, validateAddressPort("localhost:5432	"))
+	assert.True(t, validateAddressPort("	localhost:5432	"))
+}
+
+func Test_validateAddressPort_IPv4(t *testing.T) {
+	assert.True(t, validateAddressPort("127.0.0.1:5432"))
+	assert.True(t, validateAddressPort("    127.0.0.1:5432"))
+	assert.True(t, validateAddressPort("127.0.0.1:5432  "))
+	assert.True(t, validateAddressPort("    127.0.0.1:5432  "))
+}
