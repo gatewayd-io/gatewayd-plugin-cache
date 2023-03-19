@@ -47,13 +47,59 @@ func GetTablesFromQuery(query string) ([]string, error) {
 
 	tables := []string{}
 
+	isMulti := func(stmt *pgQuery.SelectStmt) bool {
+		return stmt.GetOp() == pgQuery.SetOperation_SETOP_UNION ||
+			stmt.GetOp() == pgQuery.SetOperation_SETOP_INTERSECT ||
+			stmt.GetOp() == pgQuery.SetOperation_SETOP_EXCEPT
+	}
+
+	// If the query is a union, we need to get the tables from both sides.
+	getMultiTable := func(stmt *pgQuery.SelectStmt) {
+		// Get the tables from the left side.
+		for _, fromClause := range stmt.GetLarg().FromClause {
+			rangeVar := fromClause.GetRangeVar()
+			if rangeVar != nil {
+				tables = append(tables, rangeVar.Relname)
+			}
+		}
+
+		// Get the tables from the right side.
+		for _, fromClause := range stmt.GetRarg().FromClause {
+			rangeVar := fromClause.GetRangeVar()
+			if rangeVar != nil {
+				tables = append(tables, rangeVar.Relname)
+			}
+		}
+	}
+
+	getSingleTable := func(fromClause []*pgQuery.Node) {
+		for _, from := range fromClause {
+			rangeVar := from.GetRangeVar()
+			if rangeVar != nil {
+				tables = append(tables, rangeVar.Relname)
+			}
+		}
+	}
+
 	for _, stmt := range stmt.Stmts {
-		if selectQuery := stmt.Stmt.GetSelectStmt(); selectQuery != nil {
-			for _, fromClause := range selectQuery.FromClause {
-				rangeVar := fromClause.GetRangeVar()
-				if rangeVar != nil {
-					tables = append(tables, rangeVar.Relname)
+		if isMulti(stmt.Stmt.GetSelectStmt()) {
+			getMultiTable(stmt.Stmt.GetSelectStmt())
+		}
+
+		// Get the table from the WITH clause.
+		if withClause := stmt.Stmt.GetSelectStmt().GetWithClause(); withClause != nil {
+			for _, cte := range withClause.Ctes {
+				selectStmt := cte.GetCommonTableExpr().Ctequery.GetSelectStmt()
+				if isMulti(selectStmt) {
+					getMultiTable(selectStmt)
+				} else {
+					getSingleTable(selectStmt.FromClause)
 				}
+			}
+		} else {
+			// Get the table from the FROM clause.
+			if selectQuery := stmt.Stmt.GetSelectStmt(); selectQuery != nil {
+				getSingleTable(selectQuery.FromClause)
 			}
 		}
 
