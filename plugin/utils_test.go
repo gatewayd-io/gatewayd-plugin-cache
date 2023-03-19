@@ -255,3 +255,44 @@ func Test_validateAddressPort_IPv4(t *testing.T) {
 	assert.True(t, validateAddressPort("127.0.0.1:5432  "))
 	assert.True(t, validateAddressPort("    127.0.0.1:5432  "))
 }
+
+func Test_isBusy(t *testing.T) {
+	proxies := map[string]Proxy{
+		"default": {
+			Busy: []string{"localhost:12345"},
+		},
+	}
+	assert.True(t, isBusy(proxies, "localhost:12345"))
+}
+
+func Test_isBusy_False(t *testing.T) {
+	proxies := map[string]Proxy{
+		"default": {
+			Busy: []string{"localhost:12345"},
+		},
+	}
+	assert.False(t, isBusy(proxies, "localhost:54321"))
+}
+
+func Test_isBusy_False_Empty(t *testing.T) {
+	proxies := map[string]Proxy{
+		"default": {
+			Busy: []string{},
+		},
+	}
+	assert.False(t, isBusy(proxies, "localhost:54321"))
+}
+
+func Test_isBusy_False_EmptyMap(t *testing.T) {
+	proxies := map[string]Proxy{}
+	assert.False(t, isBusy(proxies, "localhost:54321"))
+}
+
+func Test_isBusy_False_EmptyMap_EmptyBusy(t *testing.T) {
+	proxies := map[string]Proxy{
+		"default": {
+			Busy: []string{},
+		},
+	}
+	assert.False(t, isBusy(proxies, "localhost:54321"))
+}
