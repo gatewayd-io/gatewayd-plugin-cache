@@ -119,19 +119,41 @@ func GetTablesFromQuery(query string) ([]string, error) {
 	return tables, nil
 }
 
+// validateIP checks if an IP address is valid.
+func validateIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+
+	if ip.To4() != nil || ip.To16() != nil {
+		return true
+	}
+
+	return false
+}
+
 // validateAddressPort validates an address:port string.
 func validateAddressPort(addressPort string) bool {
-	data := strings.Split(addressPort, ":")
+	// Split the address and port.
+	data := strings.Split(strings.TrimSpace(addressPort), ":")
 	if len(data) != 2 {
 		return false
 	}
 
+	// Validate the port.
 	port, err := strconv.ParseUint(data[1], 10, 16)
 	if err != nil {
 		return false
 	}
 
-	if net.ParseIP(data[0]) != nil && (port > 0 && port <= 65535) {
+	// Resolve the IP address, if it is a host.
+	ip, err := net.ResolveIPAddr("ip", data[0])
+	if err != nil {
+		return false
+	}
+
+	// Validate the IP address and port.
+	if (validateIP(net.ParseIP(data[0])) || validateIP(ip.IP)) && (port > 0 && port <= 65535) {
 		return true
 	}
 
@@ -139,6 +161,7 @@ func validateAddressPort(addressPort string) bool {
 }
 
 // validateHostPort validates a host:port string.
+// TODO: Add support for IPv6.
 func validateHostPort(hostPort string) bool {
 	data := strings.Split(hostPort, ":")
 	if len(data) != 2 {
