@@ -24,6 +24,7 @@ build-dev: tidy
 
 build-release: tidy
 	@mkdir -p dist
+	@sudo apt install -y aarch64-linux-gnu-gcc
 
 	@echo "Building gatewayd ${VERSION} for linux-amd64"
 	@mkdir -p dist/linux-amd64
@@ -37,20 +38,6 @@ build-release: tidy
 	@sha256sum dist/linux-arm64/gatewayd-plugin-cache | sed 's/dist\/linux-arm64\///g' > dist/linux-arm64/checksum.txt
 	@tar czf dist/gatewayd-plugin-cache-linux-arm64-${VERSION}.tar.gz -C ./dist/linux-arm64/ ${FILES}
 
-	@echo "Building gatewayd ${VERSION} for darwin-amd64"
-	@mkdir -p dist/darwin-amd64
-	@GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w ${EXTRA_LDFLAGS}" -o dist/darwin-amd64/gatewayd-plugin-cache
-	@sha256sum dist/darwin-amd64/gatewayd-plugin-cache | sed 's/dist\/darwin-amd64\///g' > dist/darwin-amd64/checksum.txt
-	@tar czf dist/gatewayd-plugin-cache-darwin-amd64-${VERSION}.tar.gz -C ./dist/darwin-amd64/ ${FILES}
-
-	@echo "Building gatewayd ${VERSION} for darwin-arm64"
-	@mkdir -p dist/darwin-arm64
-	@GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w ${EXTRA_LDFLAGS}" -o dist/darwin-arm64/gatewayd-plugin-cache
-	@sha256sum dist/darwin-arm64/gatewayd-plugin-cache | sed 's/dist\/darwin-arm64\///g' > dist/darwin-arm64/checksum.txt
-	@tar czf dist/gatewayd-plugin-cache-darwin-arm64-${VERSION}.tar.gz -C ./dist/darwin-arm64/ ${FILES}
-
 	@echo "Generating checksums"
 	@sha256sum dist/gatewayd-plugin-cache-linux-amd64-${VERSION}.tar.gz | sed 's/dist\///g' > dist/checksums.txt
 	@sha256sum dist/gatewayd-plugin-cache-linux-arm64-${VERSION}.tar.gz | sed 's/dist\///g' >> dist/checksums.txt
-	@sha256sum dist/gatewayd-plugin-cache-darwin-amd64-${VERSION}.tar.gz | sed 's/dist\///g' >> dist/checksums.txt
-	@sha256sum dist/gatewayd-plugin-cache-darwin-arm64-${VERSION}.tar.gz | sed 's/dist\///g' >> dist/checksums.txt
