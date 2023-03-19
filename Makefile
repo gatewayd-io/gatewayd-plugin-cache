@@ -24,7 +24,8 @@ build-dev: tidy
 
 build-release: tidy
 	@mkdir -p dist
-	@sudo apt install -y aarch64-linux-gnu-gcc
+	@sudo apt-get update
+	@sudo apt-get install -y aarch64-linux-gnu-gcc
 
 	@echo "Building gatewayd ${VERSION} for linux-amd64"
 	@mkdir -p dist/linux-amd64
