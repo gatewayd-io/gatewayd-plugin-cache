@@ -86,7 +86,7 @@ func (p *Plugin) OnTrafficFromClient(
 	database := p.DefaultDBName
 	if database == "" {
 		client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
-		database := p.getDBFromStartupMessage(req, cacheManager, database, client)
+		database = p.getDBFromStartupMessage(req, cacheManager, database, client)
 
 		// Get the database from the cache if it's not found in the startup message or
 		// if the current request is not a startup message.
