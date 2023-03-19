@@ -13,6 +13,11 @@ type Proxy struct {
 
 // getProxies returns a list of proxies from GatewayD.
 func (p *Plugin) getProxies() map[string]Proxy {
+	if p.APIAddress == "" {
+		p.Logger.Error("Failed to get a list of proxies from GatewayD", "error", "APIAddress is not set")
+		return nil
+	}
+
 	resp, err := http.Get("http://" + p.APIAddress + "/v1/GatewayDPluginService/GetProxies")
 	if err != nil {
 		p.Logger.Error("Failed to get a list of proxies from GatewayD", "error", err)
