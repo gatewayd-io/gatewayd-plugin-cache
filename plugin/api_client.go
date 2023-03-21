@@ -18,6 +18,7 @@ func (p *Plugin) getProxies() map[string]Proxy {
 		return nil
 	}
 
+	//nolint: noctx
 	resp, err := http.Get("http://" + p.APIAddress + "/v1/GatewayDPluginService/GetProxies")
 	if err != nil {
 		p.Logger.Error("Failed to get a list of proxies from GatewayD", "error", err)

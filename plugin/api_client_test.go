@@ -73,7 +73,9 @@ func Test_Plugin_getProxies_Fails_Invalid_JSON(t *testing.T) {
 		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(``))
+			if _, err := w.Write([]byte(``)); err != nil {
+				t.Fatal(err)
+			}
 		}))
 		defer testServer.Close()
 
@@ -99,7 +101,9 @@ func Test_Plugin_getProxies_Fails_Empty_Response(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		if _, err := w.Write([]byte(`{}`)); err != nil {
+			t.Fatal(err)
+		}
 	}))
 	defer testServer.Close()
 
@@ -123,7 +127,9 @@ func Test_Plugin_getProxies(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"default":{"available":["localhost:45121"],"busy":["localhost:45123"],"total":2}}`))
+		if _, err := w.Write([]byte(`{"default":{"available":["localhost:45121"],"busy":["localhost:45123"],"total":2}}`)); err != nil {
+			t.Fatal(err)
+		}
 	}))
 	defer testServer.Close()
 
