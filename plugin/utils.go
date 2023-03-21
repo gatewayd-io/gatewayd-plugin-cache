@@ -9,6 +9,11 @@ import (
 	pgQuery "github.com/pganalyze/pg_query_go/v2"
 )
 
+const (
+	MinPgSQLMessageLength = 5
+	AddressPortPairLength = 2
+)
+
 // GetQueryFromRequest decodes the request and returns the query.
 func GetQueryFromRequest(req string) (string, error) {
 	requestDecoded, err := base64.StdEncoding.DecodeString(req)
@@ -16,7 +21,7 @@ func GetQueryFromRequest(req string) (string, error) {
 		return "", err
 	}
 
-	if len(requestDecoded) < 5 {
+	if len(requestDecoded) < MinPgSQLMessageLength {
 		return "", nil
 	}
 
@@ -26,7 +31,7 @@ func GetQueryFromRequest(req string) (string, error) {
 	// See https://www.postgresql.org/docs/13/protocol-message-formats.html
 	// for more information.
 	size := int(requestDecoded[1])<<24 + int(requestDecoded[2])<<16 + int(requestDecoded[3])<<8 + int(requestDecoded[4])
-	return string(requestDecoded[5:size]), nil
+	return string(requestDecoded[MinPgSQLMessageLength:size]), nil
 }
 
 // GetTablesFromQuery returns the tables used in a query.
@@ -131,7 +136,7 @@ func validateIP(ip net.IP) bool {
 func validateAddressPort(addressPort string) bool {
 	// Split the address and port.
 	data := strings.Split(strings.TrimSpace(addressPort), ":")
-	if len(data) != 2 {
+	if len(data) != AddressPortPairLength {
 		return false
 	}
 
@@ -142,13 +147,13 @@ func validateAddressPort(addressPort string) bool {
 	}
 
 	// Resolve the IP address, if it is a host.
-	ip, err := net.ResolveIPAddr("ip", data[0])
+	ipAddress, err := net.ResolveIPAddr("ip", data[0])
 	if err != nil {
 		return false
 	}
 
 	// Validate the IP address and port.
-	if (validateIP(net.ParseIP(data[0])) || validateIP(ip.IP)) && (port > 0 && port <= 65535) {
+	if (validateIP(net.ParseIP(data[0])) || validateIP(ipAddress.IP)) && (port > 0 && port <= 65535) {
 		return true
 	}
 
@@ -159,7 +164,7 @@ func validateAddressPort(addressPort string) bool {
 // TODO: Add support for IPv6.
 func validateHostPort(hostPort string) bool {
 	data := strings.Split(hostPort, ":")
-	if len(data) != 2 {
+	if len(data) != AddressPortPairLength {
 		return false
 	}
 

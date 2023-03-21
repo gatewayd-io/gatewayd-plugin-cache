@@ -55,19 +55,19 @@ func NewCachePlugin(impl Plugin) *CachePlugin {
 }
 
 // GRPCServer registers the plugin with the gRPC server.
-func (p *CachePlugin) GRPCServer(b *goplugin.GRPCBroker, s *grpc.Server) error {
+func (p *CachePlugin) GRPCServer(_ *goplugin.GRPCBroker, s *grpc.Server) error {
 	v1.RegisterGatewayDPluginServiceServer(s, &p.Impl)
 	return nil
 }
 
 // GRPCClient returns the plugin client.
-func (p *CachePlugin) GRPCClient(ctx context.Context, b *goplugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+func (p *CachePlugin) GRPCClient(_ context.Context, _ *goplugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
 	return v1.NewGatewayDPluginServiceClient(c), nil
 }
 
 // GetPluginConfig returns the plugin config.
 func (p *Plugin) GetPluginConfig(
-	ctx context.Context, req *structpb.Struct,
+	_ context.Context, _ *structpb.Struct,
 ) (*structpb.Struct, error) {
 	return structpb.NewStruct(PluginConfig)
 }
@@ -87,7 +87,7 @@ func (p *Plugin) OnTrafficFromClient(
 	database := p.DefaultDBName
 	if database == "" {
 		client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
-		database = p.getDBFromStartupMessage(req, cacheManager, database, client)
+		database = p.getDBFromStartupMessage(ctx, req, cacheManager, database, client)
 
 		// Get the database from the cache if it's not found in the startup message or
 		// if the current request is not a startup message.
@@ -125,7 +125,7 @@ func (p *Plugin) OnTrafficFromClient(
 		p.Logger.Trace("Query", "query", query)
 
 		// Clear the cache if the query is an insert, update or delete query.
-		p.invalidateDML(query)
+		p.invalidateDML(ctx, query)
 
 		// Check if the query is cached.
 		response, err := cacheManager.Get(ctx, cacheKey)
@@ -210,23 +210,25 @@ func (p *Plugin) OnTrafficFromServer(
 		query, err := GetQueryFromRequest(request)
 		if err != nil {
 			p.Logger.Debug("Failed to get query from request", "error", err)
-		} else {
-			tables, err := GetTablesFromQuery(query)
-			if err != nil {
-				p.Logger.Debug("Failed to get tables from query", "error", err)
-			} else {
-				// Cache the table(s) used in each cached request. This is used to invalidate
-				// the cache when a rows is inserted, updated or deleted into that table.
-				for _, table := range tables {
-					requestQueryCacheKey := strings.Join([]string{table, cacheKey}, ":")
-					if err := cacheManager.Set(
-						ctx, requestQueryCacheKey, "", options...); err != nil {
-						CacheMissesCounter.Inc()
-						p.Logger.Debug("Failed to set cache", "error", err)
-					}
-					CacheSetsCounter.Inc()
-				}
+			return resp, nil
+		}
+
+		tables, err := GetTablesFromQuery(query)
+		if err != nil {
+			p.Logger.Debug("Failed to get tables from query", "error", err)
+			return resp, nil
+		}
+
+		// Cache the table(s) used in each cached request. This is used to invalidate
+		// the cache when a rows is inserted, updated or deleted into that table.
+		for _, table := range tables {
+			requestQueryCacheKey := strings.Join([]string{table, cacheKey}, ":")
+			if err := cacheManager.Set(
+				ctx, requestQueryCacheKey, "", options...); err != nil {
+				CacheMissesCounter.Inc()
+				p.Logger.Debug("Failed to set cache", "error", err)
 			}
+			CacheSetsCounter.Inc()
 		}
 	}
 
@@ -249,70 +251,72 @@ func (p *Plugin) OnClosed(ctx context.Context, req *structpb.Struct) (*structpb.
 
 // invalidateDML invalidates the cache for the tables that are affected by the DML.
 // This is done by getting the cached queries for each table and deleting them.
-func (p *Plugin) invalidateDML(query string) {
-	ctx := context.Background()
-
+func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 	// Check if the query is a UPDATE, INSERT or DELETE.
 	queryDecoded, err := base64.StdEncoding.DecodeString(query)
 	if err != nil {
 		p.Logger.Debug("Failed to decode query", "error", err)
-	} else {
-		queryMessage := cast.ToStringMapString(string(queryDecoded))
-		p.Logger.Trace("Query message", "query", queryMessage)
+		return
+	}
 
-		queryString := strings.ToUpper(queryMessage["String"])
-		// TODO: Add change detection for all changes to DB, not just for the DMLs.
-		// https://github.com/gatewayd-io/gatewayd-plugin-cache/issues/19
-		if strings.HasPrefix(queryString, "UPDATE") ||
-			strings.HasPrefix(queryString, "INSERT") ||
-			strings.HasPrefix(queryString, "DELETE") {
-			tables, err := GetTablesFromQuery(queryMessage["String"])
+	queryMessage := cast.ToStringMapString(string(queryDecoded))
+	p.Logger.Trace("Query message", "query", queryMessage)
 
-			if err != nil {
-				p.Logger.Debug("Failed to get tables from query", "error", err)
+	queryString := strings.ToUpper(queryMessage["String"])
+	// TODO: Add change detection for all changes to DB, not just for the DMLs.
+	// https://github.com/gatewayd-io/gatewayd-plugin-cache/issues/19
+	if !strings.HasPrefix(queryString, "UPDATE") ||
+		!strings.HasPrefix(queryString, "INSERT") ||
+		!strings.HasPrefix(queryString, "DELETE") {
+		p.Logger.Debug("Query is not a DML. Skipping invalidation")
+		return
+	}
+
+	tables, err := GetTablesFromQuery(queryMessage["String"])
+	if err != nil {
+		p.Logger.Debug("Failed to get tables from query", "error", err)
+		return
+	}
+
+	p.Logger.Trace("Tables", "tables", tables)
+	for _, table := range tables {
+		// Invalidate the cache for the table.
+		// TODO: This is not efficient. We should be able to invalidate the cache
+		// for a specific key instead of invalidating the entire table.
+		pipeline := p.RedisClient.Pipeline()
+		for {
+			scanResult := p.RedisClient.Scan(ctx, 0, table+":*", p.ScanCount)
+			if scanResult.Err() != nil {
+				CacheMissesCounter.Inc()
+				p.Logger.Debug("Failed to scan keys", "error", scanResult.Err())
+				break
+			}
+
+			// Per each key, delete the cache entry and the table cache key itself.
+			keys, cursor := scanResult.Val()
+			for _, tableKey := range keys {
+				// Invalidate the cache for the table.
+				cachedRespnseKey := strings.TrimPrefix(tableKey, table+":")
+				pipeline.Del(ctx, cachedRespnseKey)
+				// Invalidate the table cache key itself.
+				pipeline.Del(ctx, tableKey)
+			}
+
+			if cursor == 0 {
+				break
+			}
+		}
+
+		result, err := pipeline.Exec(ctx)
+		if err != nil {
+			p.Logger.Debug("Failed to execute pipeline", "error", err)
+		}
+
+		for _, res := range result {
+			if res.Err() != nil {
+				CacheMissesCounter.Inc()
 			} else {
-				p.Logger.Trace("Tables", "tables", tables)
-				for _, table := range tables {
-					// Invalidate the cache for the table.
-					// TODO: This is not efficient. We should be able to invalidate the cache
-					// for a specific key instead of invalidating the entire table.
-					pipeline := p.RedisClient.Pipeline()
-					for {
-						scanResult := p.RedisClient.Scan(ctx, 0, table+":*", p.ScanCount)
-						if scanResult.Err() != nil {
-							CacheMissesCounter.Inc()
-							p.Logger.Debug("Failed to scan keys", "error", scanResult.Err())
-							break
-						}
-
-						// Per each key, delete the cache entry and the table cache key itself.
-						keys, cursor := scanResult.Val()
-						for _, tableKey := range keys {
-							// Invalidate the cache for the table.
-							cachedRespnseKey := strings.TrimPrefix(tableKey, table+":")
-							pipeline.Del(ctx, cachedRespnseKey)
-							// Invalidate the table cache key itself.
-							pipeline.Del(ctx, tableKey)
-						}
-
-						if cursor == 0 {
-							break
-						}
-					}
-
-					result, err := pipeline.Exec(ctx)
-					if err != nil {
-						p.Logger.Debug("Failed to execute pipeline", "error", err)
-					}
-
-					for _, res := range result {
-						if res.Err() != nil {
-							CacheMissesCounter.Inc()
-						} else {
-							CacheDeletesCounter.Inc()
-						}
-					}
-				}
+				CacheDeletesCounter.Inc()
 			}
 		}
 	}
@@ -320,39 +324,41 @@ func (p *Plugin) invalidateDML(query string) {
 
 // getDBFromStartupMessage gets the database name from the startup message.
 func (p *Plugin) getDBFromStartupMessage(
+	ctx context.Context,
 	req *structpb.Struct,
 	cacheManager *cache.Cache[string],
 	database string,
 	client map[string]string,
 ) string {
-	ctx := context.Background()
-
 	// Try to get the database from the startup message, which is only sent once by the client.
 	// Store the database in the cache so that we can use it for subsequent requests.
 	startupMessageEncoded := cast.ToString(sdkPlugin.GetAttr(req, "startupMessage", ""))
-	if startupMessageEncoded != "" {
-		startupMessageBytes, err := base64.StdEncoding.DecodeString(startupMessageEncoded)
-		if err != nil {
-			p.Logger.Debug("Failed to decode startup message", "error", err)
-		} else {
-			startupMessage := cast.ToStringMap(string(startupMessageBytes))
-			p.Logger.Trace("Startup message", "startupMessage", startupMessage, "client", client)
-			if startupMessage != nil && client != nil {
-				startupMsgParams := cast.ToStringMapString(startupMessage["Parameters"])
-				if startupMsgParams != nil &&
-					startupMsgParams["database"] != "" &&
-					client["remote"] != "" {
-					if err := cacheManager.Set(
-						ctx, client["remote"], startupMsgParams["database"]); err != nil {
-						CacheMissesCounter.Inc()
-						p.Logger.Debug("Failed to set cache", "error", err)
-					}
-					CacheSetsCounter.Inc()
-					p.Logger.Debug("Set the database in the cache for the current session",
-						"database", database, "client", client["remote"])
-					return startupMsgParams["database"]
-				}
+	if startupMessageEncoded == "" {
+		return database
+	}
+
+	startupMessageBytes, err := base64.StdEncoding.DecodeString(startupMessageEncoded)
+	if err != nil {
+		p.Logger.Debug("Failed to decode startup message", "error", err)
+		return database
+	}
+
+	startupMessage := cast.ToStringMap(string(startupMessageBytes))
+	p.Logger.Trace("Startup message", "startupMessage", startupMessage, "client", client)
+	if startupMessage != nil && client != nil {
+		startupMsgParams := cast.ToStringMapString(startupMessage["Parameters"])
+		if startupMsgParams != nil &&
+			startupMsgParams["database"] != "" &&
+			client["remote"] != "" {
+			if err := cacheManager.Set(
+				ctx, client["remote"], startupMsgParams["database"]); err != nil {
+				CacheMissesCounter.Inc()
+				p.Logger.Debug("Failed to set cache", "error", err)
 			}
+			CacheSetsCounter.Inc()
+			p.Logger.Debug("Set the database in the cache for the current session",
+				"database", database, "client", client["remote"])
+			return startupMsgParams["database"]
 		}
 	}
 
