@@ -32,8 +32,8 @@ jobs:
           TOKEN: ${{ secrets.GH_SDK_TOKEN }}
           GOPRIVATE: github.com/gatewayd-io/gatewayd-*
 
-      # - name: Lint code issues 🚨
-      #   uses: golangci/golangci-lint-action@v3
+      - name: Lint code issues 🚨
+        uses: golangci/golangci-lint-action@v3
 
       - name: Run Go tests 🔬
         run: go test -cover -covermode atomic -coverprofile=profile.cov -v ./...
