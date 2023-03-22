@@ -34,6 +34,39 @@ func GetQueryFromRequest(req string) (string, error) {
 	return string(requestDecoded[MinPgSQLMessageLength:size]), nil
 }
 
+// isMulti checks if the query is a union, intersect, or except.
+func isMulti(stmt *pgQuery.SelectStmt) bool {
+	return stmt.GetOp() == pgQuery.SetOperation_SETOP_UNION ||
+		stmt.GetOp() == pgQuery.SetOperation_SETOP_INTERSECT ||
+		stmt.GetOp() == pgQuery.SetOperation_SETOP_EXCEPT
+}
+
+// getSingleTable returns the tables used in a query.
+func getSingleTable(stmt *pgQuery.SelectStmt) []string {
+	tables := []string{}
+	for _, from := range stmt.FromClause {
+		rangeVar := from.GetRangeVar()
+		if rangeVar != nil {
+			tables = append(tables, rangeVar.Relname)
+		}
+	}
+
+	return tables
+}
+
+// getMultiTable returns the tables used in a union, intersect, or except query.
+func getMultiTable(stmt *pgQuery.SelectStmt) []string {
+	tables := []string{}
+	// Get the tables from the left side.
+	left := stmt.GetLarg()
+	tables = append(tables, getSingleTable(left)...)
+	// Get the tables from the right side.
+	right := stmt.GetRarg()
+	tables = append(tables, getSingleTable(right)...)
+
+	return tables
+}
+
 // GetTablesFromQuery returns the tables used in a query.
 func GetTablesFromQuery(query string) ([]string, error) {
 	stmt, err := pgQuery.Parse(query)
@@ -47,43 +80,11 @@ func GetTablesFromQuery(query string) ([]string, error) {
 
 	tables := []string{}
 
-	isMulti := func(stmt *pgQuery.SelectStmt) bool {
-		return stmt.GetOp() == pgQuery.SetOperation_SETOP_UNION ||
-			stmt.GetOp() == pgQuery.SetOperation_SETOP_INTERSECT ||
-			stmt.GetOp() == pgQuery.SetOperation_SETOP_EXCEPT
-	}
-
-	// If the query is a union, we need to get the tables from both sides.
-	getMultiTable := func(stmt *pgQuery.SelectStmt) {
-		// Get the tables from the left side.
-		for _, fromClause := range stmt.GetLarg().FromClause {
-			rangeVar := fromClause.GetRangeVar()
-			if rangeVar != nil {
-				tables = append(tables, rangeVar.Relname)
-			}
-		}
-
-		// Get the tables from the right side.
-		for _, fromClause := range stmt.GetRarg().FromClause {
-			rangeVar := fromClause.GetRangeVar()
-			if rangeVar != nil {
-				tables = append(tables, rangeVar.Relname)
-			}
-		}
-	}
-
-	getSingleTable := func(fromClause []*pgQuery.Node) {
-		for _, from := range fromClause {
-			rangeVar := from.GetRangeVar()
-			if rangeVar != nil {
-				tables = append(tables, rangeVar.Relname)
-			}
-		}
-	}
-
 	for _, stmt := range stmt.Stmts {
-		if isMulti(stmt.Stmt.GetSelectStmt()) {
-			getMultiTable(stmt.Stmt.GetSelectStmt())
+		// Get the tables from the left and right side of the complex query.
+		selectStatement := stmt.Stmt.GetSelectStmt()
+		if isMulti(selectStatement) {
+			tables = append(tables, getMultiTable(selectStatement)...)
 		}
 
 		// Get the table from the WITH clause.
@@ -91,15 +92,15 @@ func GetTablesFromQuery(query string) ([]string, error) {
 			for _, cte := range withClause.Ctes {
 				selectStmt := cte.GetCommonTableExpr().Ctequery.GetSelectStmt()
 				if isMulti(selectStmt) {
-					getMultiTable(selectStmt)
+					tables = append(tables, getMultiTable(selectStmt)...)
 				} else {
-					getSingleTable(selectStmt.FromClause)
+					tables = append(tables, getSingleTable(selectStmt)...)
 				}
 			}
 		} else {
 			// Get the table from the FROM clause.
-			if selectQuery := stmt.Stmt.GetSelectStmt(); selectQuery != nil {
-				getSingleTable(selectQuery.FromClause)
+			if selectStatement := stmt.Stmt.GetSelectStmt(); selectStatement != nil {
+				tables = append(tables, getSingleTable(selectStatement)...)
 			}
 		}
 
