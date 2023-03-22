@@ -6,9 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/eko/gocache/lib/v4/cache"
-	"github.com/eko/gocache/lib/v4/store"
-	"github.com/eko/gocache/store/redis/v4"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/databases/postgres"
 	sdkPlugin "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
@@ -28,7 +25,6 @@ type Plugin struct {
 
 	// Cache configuration.
 	RedisClient   *goRedis.Client
-	RedisStore    *redis.RedisStore
 	RedisURL      string
 	Expiry        time.Duration
 	DefaultDBName string
@@ -76,8 +72,6 @@ func (p *Plugin) GetPluginConfig(
 func (p *Plugin) OnTrafficFromClient(
 	ctx context.Context, req *structpb.Struct,
 ) (*structpb.Struct, error) {
-	cacheManager := cache.New[string](p.RedisStore)
-
 	req, err := postgres.HandleClientMessage(req, p.Logger)
 	if err != nil {
 		p.Logger.Info("Failed to handle client message", "error", err)
@@ -87,12 +81,12 @@ func (p *Plugin) OnTrafficFromClient(
 	database := p.DefaultDBName
 	if database == "" {
 		client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
-		database = p.getDBFromStartupMessage(ctx, req, cacheManager, database, client)
+		database = p.getDBFromStartupMessage(ctx, req, database, client)
 
 		// Get the database from the cache if it's not found in the startup message or
 		// if the current request is not a startup message.
 		if database == "" {
-			database, err = cacheManager.Get(ctx, client["remote"])
+			database, err = p.RedisClient.Get(ctx, client["remote"]).Result()
 			if err != nil {
 				CacheMissesCounter.Inc()
 				p.Logger.Debug("Failed to get cache", "error", err)
@@ -128,7 +122,7 @@ func (p *Plugin) OnTrafficFromClient(
 		p.invalidateDML(ctx, query)
 
 		// Check if the query is cached.
-		response, err := cacheManager.Get(ctx, cacheKey)
+		response, err := p.RedisClient.Get(ctx, cacheKey).Result()
 		if err != nil {
 			CacheMissesCounter.Inc()
 			p.Logger.Debug("Failed to get cached response", "error", err)
@@ -153,8 +147,6 @@ func (p *Plugin) OnTrafficFromClient(
 func (p *Plugin) OnTrafficFromServer(
 	ctx context.Context, resp *structpb.Struct,
 ) (*structpb.Struct, error) {
-	cacheManager := cache.New[string](p.RedisStore)
-
 	resp, err := postgres.HandleServerMessage(resp, p.Logger)
 	if err != nil {
 		p.Logger.Info("Failed to handle server message", "error", err)
@@ -172,7 +164,7 @@ func (p *Plugin) OnTrafficFromServer(
 	if database == "" {
 		client := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "client", ""))
 		if client != nil && client["remote"] != "" {
-			database, err = cacheManager.Get(ctx, client["remote"])
+			database, err = p.RedisClient.Get(ctx, client["remote"]).Result()
 			if err != nil {
 				CacheMissesCounter.Inc()
 				p.Logger.Debug("Failed to get cached response", "error", err)
@@ -191,16 +183,9 @@ func (p *Plugin) OnTrafficFromServer(
 	}
 
 	cacheKey := strings.Join([]string{server["remote"], database, request}, ":")
-
-	options := []store.Option{}
-	if p.Expiry.Seconds() > 0 {
-		p.Logger.Debug("Key expiry is set", "expiry", p.Expiry)
-		options = append(options, store.WithExpiration(p.Expiry))
-	}
-
 	if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
 		// The request was successful and the response contains data. Cache the response.
-		if err := cacheManager.Set(ctx, cacheKey, response, options...); err != nil {
+		if err := p.RedisClient.Set(ctx, cacheKey, response, p.Expiry).Err(); err != nil {
 			CacheMissesCounter.Inc()
 			p.Logger.Debug("Failed to set cache", "error", err)
 		}
@@ -223,8 +208,8 @@ func (p *Plugin) OnTrafficFromServer(
 		// the cache when a rows is inserted, updated or deleted into that table.
 		for _, table := range tables {
 			requestQueryCacheKey := strings.Join([]string{table, cacheKey}, ":")
-			if err := cacheManager.Set(
-				ctx, requestQueryCacheKey, "", options...); err != nil {
+			if err := p.RedisClient.Set(
+				ctx, requestQueryCacheKey, "", p.Expiry).Err(); err != nil {
 				CacheMissesCounter.Inc()
 				p.Logger.Debug("Failed to set cache", "error", err)
 			}
@@ -236,10 +221,9 @@ func (p *Plugin) OnTrafficFromServer(
 }
 
 func (p *Plugin) OnClosed(ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
-	cacheManager := cache.New[string](p.RedisStore)
 	client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
 	if client != nil {
-		if err := cacheManager.Delete(ctx, client["remote"]); err != nil {
+		if err := p.RedisClient.Del(ctx, client["remote"]).Err(); err != nil {
 			p.Logger.Debug("Failed to delete cache", "error", err)
 			CacheMissesCounter.Inc()
 		}
@@ -326,7 +310,6 @@ func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 func (p *Plugin) getDBFromStartupMessage(
 	ctx context.Context,
 	req *structpb.Struct,
-	cacheManager *cache.Cache[string],
 	database string,
 	client map[string]string,
 ) string {
@@ -350,8 +333,11 @@ func (p *Plugin) getDBFromStartupMessage(
 		if startupMsgParams != nil &&
 			startupMsgParams["database"] != "" &&
 			client["remote"] != "" {
-			if err := cacheManager.Set(
-				ctx, client["remote"], startupMsgParams["database"]); err != nil {
+			if err := p.RedisClient.Set(
+				ctx, client["remote"],
+				startupMsgParams["database"],
+				time.Duration(0),
+			).Err(); err != nil {
 				CacheMissesCounter.Inc()
 				p.Logger.Debug("Failed to set cache", "error", err)
 			}
