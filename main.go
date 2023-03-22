@@ -56,7 +56,7 @@ func main() {
 		// Ping the Redis server to check if it is available.
 		_, err = pluginInstance.Impl.RedisClient.Ping(context.Background()).Result()
 		if err != nil {
-			logger.Error("Failed to ping Redis server", "error", err)
+			logger.Error("Failed to ping Redis server, plugin exited", "error", err)
 			os.Exit(1)
 		}
 
