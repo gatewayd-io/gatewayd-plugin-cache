@@ -240,6 +240,48 @@ func Test_GetTablesFromQuery_DeleteMultiple(t *testing.T) {
 	assert.Equal(t, []string{"users", "comments"}, tables)
 }
 
+func Test_GetTablesFromQuery_Truncate(t *testing.T) {
+	query := "TRUNCATE users"
+	tables, err := GetTablesFromQuery(query)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"users"}, tables)
+}
+
+func Test_GetTablesFromQuery_TruncateMultiple(t *testing.T) {
+	query := "TRUNCATE users, comments"
+	tables, err := GetTablesFromQuery(query)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"users", "comments"}, tables)
+}
+
+func Test_GetTablesFromQuery_Drop(t *testing.T) {
+	query := "DROP TABLE users"
+	tables, err := GetTablesFromQuery(query)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"users"}, tables)
+}
+
+func Test_GetTablesFromQuery_DropMultiple(t *testing.T) {
+	query := "DROP TABLE users, comments"
+	tables, err := GetTablesFromQuery(query)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"users", "comments"}, tables)
+}
+
+func Test_GetTablesFromQuery_Alter(t *testing.T) {
+	query := "ALTER TABLE users ADD COLUMN name VARCHAR(255)"
+	tables, err := GetTablesFromQuery(query)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"users"}, tables)
+}
+
+func Test_GetTablesFromQuery_AlterMultiple(t *testing.T) {
+	query := "ALTER TABLE users ADD COLUMN name VARCHAR(255); ALTER TABLE comments ADD COLUMN name VARCHAR(255)"
+	tables, err := GetTablesFromQuery(query)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"users", "comments"}, tables)
+}
+
 func Test_validateAddressPort_Hostname(t *testing.T) {
 	assert.True(t, validateAddressPort("localhost:5432"))
 	assert.True(t, validateAddressPort("	localhost:5432"))
