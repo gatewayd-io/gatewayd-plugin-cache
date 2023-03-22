@@ -115,6 +115,24 @@ func GetTablesFromQuery(query string) ([]string, error) {
 		if deleteQuery := stmt.Stmt.GetDeleteStmt(); deleteQuery != nil {
 			tables = append(tables, deleteQuery.Relation.Relname)
 		}
+
+		if truncateQuery := stmt.Stmt.GetTruncateStmt(); truncateQuery != nil {
+			for _, relation := range truncateQuery.Relations {
+				tables = append(tables, relation.GetRangeVar().Relname)
+			}
+		}
+
+		if dropTable := stmt.Stmt.GetDropStmt(); dropTable != nil {
+			for _, object := range dropTable.GetObjects() {
+				for _, table := range object.GetList().GetItems() {
+					tables = append(tables, table.GetString_().Str)
+				}
+			}
+		}
+
+		if alterTable := stmt.Stmt.GetAlterTableStmt(); alterTable != nil {
+			tables = append(tables, alterTable.Relation.Relname)
+		}
 	}
 
 	return tables, nil
