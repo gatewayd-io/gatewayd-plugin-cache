@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	miniredis "github.com/alicebob/miniredis/v2"
-	redisStore "github.com/eko/gocache/store/redis/v4"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
@@ -37,8 +36,6 @@ func Test_Plugin(t *testing.T) {
 	assert.NotNil(t, redisConfig)
 	redisClient := redis.NewClient(redisConfig)
 	assert.NotNil(t, redisClient)
-	redisStore := redisStore.NewRedis(redisClient)
-	assert.NotNil(t, redisStore)
 
 	// Create and initialize a new plugin.
 	logger := hclog.New(&hclog.LoggerOptions{
@@ -49,7 +46,6 @@ func Test_Plugin(t *testing.T) {
 		Logger:      logger,
 		RedisURL:    redisURL,
 		RedisClient: redisClient,
-		RedisStore:  redisStore,
 	})
 	assert.NotNil(t, p)
 

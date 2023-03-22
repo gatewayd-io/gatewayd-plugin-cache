@@ -5,7 +5,6 @@ import (
 	"flag"
 	"os"
 
-	redisStore "github.com/eko/gocache/store/redis/v4"
 	"github.com/gatewayd-io/gatewayd-plugin-cache/plugin"
 	sdkConfig "github.com/gatewayd-io/gatewayd-plugin-sdk/config"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
@@ -59,10 +58,6 @@ func main() {
 			logger.Error("Failed to ping Redis server, plugin exited", "error", err)
 			os.Exit(1)
 		}
-
-		pluginInstance.Impl.RedisStore = redisStore.NewRedis(
-			pluginInstance.Impl.RedisClient,
-		)
 
 		pluginInstance.Impl.PeriodicInvalidatorEnabled = cast.ToBool(
 			cfg["periodicInvalidatorEnabled"])
