@@ -192,13 +192,13 @@ func (p *Plugin) OnTrafficFromServer(
 		CacheSetsCounter.Inc()
 
 		// Cache the query as well.
-		query, err := GetQueryFromRequest(request)
+		query, err := postgres.GetQueryFromRequest(request)
 		if err != nil {
 			p.Logger.Debug("Failed to get query from request", "error", err)
 			return resp, nil
 		}
 
-		tables, err := GetTablesFromQuery(query)
+		tables, err := postgres.GetTablesFromQuery(query)
 		if err != nil {
 			p.Logger.Debug("Failed to get tables from query", "error", err)
 			return resp, nil
@@ -256,7 +256,7 @@ func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 		return
 	}
 
-	tables, err := GetTablesFromQuery(queryMessage["String"])
+	tables, err := postgres.GetTablesFromQuery(queryMessage["String"])
 	if err != nil {
 		p.Logger.Debug("Failed to get tables from query", "error", err)
 		return
