@@ -15,6 +15,13 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+func testQueryRequest() (string, string) {
+	query := "SELECT * FROM users"
+	queryMsg := pgproto3.Query{String: query}
+	// Encode the data to base64.
+	return query, base64.StdEncoding.EncodeToString(queryMsg.Encode(nil))
+}
+
 func testStartupRequest() string {
 	startupMsg := pgproto3.StartupMessage{
 		ProtocolVersion: 196608,
