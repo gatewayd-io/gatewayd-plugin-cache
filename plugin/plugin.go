@@ -268,8 +268,9 @@ func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 		// TODO: This is not efficient. We should be able to invalidate the cache
 		// for a specific key instead of invalidating the entire table.
 		pipeline := p.RedisClient.Pipeline()
+		var cursor uint64
 		for {
-			scanResult := p.RedisClient.Scan(ctx, 0, table+":*", p.ScanCount)
+			scanResult := p.RedisClient.Scan(ctx, cursor, table+":*", p.ScanCount)
 			if scanResult.Err() != nil {
 				CacheMissesCounter.Inc()
 				p.Logger.Debug("Failed to scan keys", "error", scanResult.Err())
@@ -277,7 +278,8 @@ func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 			}
 
 			// Per each key, delete the cache entry and the table cache key itself.
-			keys, cursor := scanResult.Val()
+			var keys []string
+			keys, cursor = scanResult.Val()
 			for _, tableKey := range keys {
 				// Invalidate the cache for the table.
 				cachedRespnseKey := strings.TrimPrefix(tableKey, table+":")

@@ -21,43 +21,57 @@ func (p *Plugin) PeriodicInvalidator() {
 		p.Logger.Trace("Got proxies from GatewayD", "proxies", proxies)
 
 		// Get all the client keys and delete the ones that are not valid.
-		// TODO: use scan instead of keys.
-		for _, address := range p.RedisClient.Keys(context.Background(), "*:*").Val() {
-			valid := false
-
-			// Validate the address if the address is an IP address.
-			if ok, err := validateAddressPort(address); ok && err == nil {
-				valid = true
-			} else {
-				p.Logger.Trace(
-					"Skipping connection because it is invalid", "address", address, "error", err)
+		var cursor uint64
+		for {
+			scanResult := p.RedisClient.Scan(context.Background(), cursor, "*:*", p.ScanCount)
+			if scanResult.Err() != nil {
+				p.Logger.Error("Failed to scan keys", "error", scanResult.Err())
+				break
 			}
 
-			if !valid {
-				// Validate the address if the address is a hostname.
-				if ok, err := validateHostPort(address); ok && err == nil {
+			var addresses []string
+			addresses, cursor = scanResult.Val()
+			for _, address := range addresses {
+				valid := false
+
+				// Validate the address if the address is an IP address.
+				if ok, err := validateAddressPort(address); ok && err == nil {
 					valid = true
 				} else {
 					p.Logger.Trace(
 						"Skipping connection because it is invalid", "address", address, "error", err)
+				}
+
+				if !valid {
+					// Validate the address if the address is a hostname.
+					if ok, err := validateHostPort(address); ok && err == nil {
+						valid = true
+					} else {
+						p.Logger.Trace(
+							"Skipping connection because it is invalid", "address", address, "error", err)
+						continue
+					}
+				}
+
+				// If the address is not valid, skip it.
+				if !valid {
 					continue
 				}
+
+				// If the connection is busy (a client is connected), it is not safe to delete the key.
+				if isBusy(proxies, address) {
+					p.Logger.Trace("Skipping connection because it is busy", "address", address)
+					continue
+				}
+
+				p.RedisClient.Del(context.Background(), address)
+				p.Logger.Trace("Deleted stale address", "address", address)
+				CacheDeletesCounter.Inc()
 			}
 
-			// If the address is not valid, skip it.
-			if !valid {
-				continue
+			if cursor == 0 {
+				break
 			}
-
-			// If the connection is busy (a client is connected), it is not safe to delete the key.
-			if isBusy(proxies, address) {
-				p.Logger.Trace("Skipping connection because it is busy", "address", address)
-				continue
-			}
-
-			p.RedisClient.Del(context.Background(), address)
-			p.Logger.Trace("Deleted stale address", "address", address)
-			CacheDeletesCounter.Inc()
 		}
 	}); err != nil {
 		p.Logger.Error("Failed to start periodic invalidator",
