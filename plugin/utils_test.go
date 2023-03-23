@@ -283,17 +283,51 @@ func Test_GetTablesFromQuery_AlterMultiple(t *testing.T) {
 }
 
 func Test_validateAddressPort_Hostname(t *testing.T) {
-	assert.True(t, validateAddressPort("localhost:5432"))
-	assert.True(t, validateAddressPort("	localhost:5432"))
-	assert.True(t, validateAddressPort("localhost:5432	"))
-	assert.True(t, validateAddressPort("	localhost:5432	"))
+	valid, err := validateAddressPort("localhost:5432")
+	assert.True(t, valid)
+	assert.Nil(t, err)
+
+	valid, err = validateAddressPort("	localhost:5432")
+	assert.True(t, valid)
+	assert.Nil(t, err)
+
+	valid, err = validateAddressPort("localhost:5432	")
+	assert.True(t, valid)
+	assert.Nil(t, err)
+
+	valid, err = validateAddressPort("	localhost:5432	")
+	assert.True(t, valid)
+	assert.Nil(t, err)
+}
+
+func Test_validateAddressPort_Fails(t *testing.T) {
+	valid, err := validateAddressPort("localhost")
+	assert.False(t, valid)
+	assert.NotNil(t, err)
+}
+
+func Test_validateHostPort_Fails(t *testing.T) {
+	valid, err := validateHostPort("127.0.0.1")
+	assert.False(t, valid)
+	assert.NotNil(t, err)
 }
 
 func Test_validateAddressPort_IPv4(t *testing.T) {
-	assert.True(t, validateAddressPort("127.0.0.1:5432"))
-	assert.True(t, validateAddressPort("    127.0.0.1:5432"))
-	assert.True(t, validateAddressPort("127.0.0.1:5432  "))
-	assert.True(t, validateAddressPort("    127.0.0.1:5432  "))
+	valid, err := validateAddressPort("127.0.0.1:5432")
+	assert.True(t, valid)
+	assert.Nil(t, err)
+
+	valid, err = validateAddressPort("    127.0.0.1:5432")
+	assert.True(t, valid)
+	assert.Nil(t, err)
+
+	valid, err = validateAddressPort("127.0.0.1:5432  ")
+	assert.True(t, valid)
+	assert.Nil(t, err)
+
+	valid, err = validateAddressPort("    127.0.0.1:5432  ")
+	assert.True(t, valid)
+	assert.Nil(t, err)
 }
 
 func Test_isBusy(t *testing.T) {

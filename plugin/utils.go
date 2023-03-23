@@ -154,6 +154,7 @@ func validateIP(ip net.IP) bool {
 // validateAddressPort validates an address:port string.
 func validateAddressPort(addressPort string) (bool, error) {
 	// Split the address and port.
+	// TODO: Support IPv6.
 	data := strings.Split(strings.TrimSpace(addressPort), ":")
 	if len(data) != AddressPortPairLength {
 		return false, ErrInvalidAddressPortPair
