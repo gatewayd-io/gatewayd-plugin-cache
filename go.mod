@@ -4,13 +4,12 @@ go 1.20
 
 require (
 	github.com/alicebob/miniredis/v2 v2.30.1
-	github.com/gatewayd-io/gatewayd-plugin-sdk v0.0.17
+	github.com/gatewayd-io/gatewayd-plugin-sdk v0.0.18
 	github.com/go-co-op/gocron v1.19.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-plugin v1.4.9
 	github.com/jackc/pgx/v5 v5.3.1
-	github.com/pganalyze/pg_query_go/v2 v2.2.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/spf13/cast v1.5.0
 	github.com/stretchr/testify v1.8.2
@@ -33,6 +32,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/oklog/run v1.1.0 // indirect
+	github.com/pganalyze/pg_query_go/v2 v2.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
