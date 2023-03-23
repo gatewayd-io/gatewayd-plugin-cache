@@ -152,52 +152,52 @@ func validateIP(ip net.IP) bool {
 }
 
 // validateAddressPort validates an address:port string.
-func validateAddressPort(addressPort string) bool {
+func validateAddressPort(addressPort string) (bool, error) {
 	// Split the address and port.
 	data := strings.Split(strings.TrimSpace(addressPort), ":")
 	if len(data) != AddressPortPairLength {
-		return false
+		return false, ErrInvalidAddressPortPair
 	}
 
 	// Validate the port.
 	port, err := strconv.ParseUint(data[1], 10, 16)
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	// Resolve the IP address, if it is a host.
 	ipAddress, err := net.ResolveIPAddr("ip", data[0])
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	// Validate the IP address and port.
 	if (validateIP(net.ParseIP(data[0])) || validateIP(ipAddress.IP)) && (port > 0 && port <= 65535) {
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 // validateHostPort validates a host:port string.
 // TODO: Add support for IPv6.
-func validateHostPort(hostPort string) bool {
+func validateHostPort(hostPort string) (bool, error) {
 	data := strings.Split(hostPort, ":")
 	if len(data) != AddressPortPairLength {
-		return false
+		return false, ErrInvalidAddressPortPair
 	}
 
 	port, err := strconv.ParseUint(data[1], 10, 16)
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	// FIXME: There is not much to validate on the host side.
 	if data[0] != "" && port > 0 && port <= 65535 {
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 // isBusy checks if a client address exists in cache by matching the address
