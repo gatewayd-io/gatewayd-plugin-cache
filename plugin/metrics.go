@@ -32,4 +32,14 @@ var (
 		Name:      "cache_deletes_total",
 		Help:      "The total number of cache deletes",
 	})
+	CacheScanCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: metrics.Namespace,
+		Name:      "cache_scans_total",
+		Help:      "The total number of cache scans",
+	})
+	CacheScanKeysCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: metrics.Namespace,
+		Name:      "cache_scan_keys_total",
+		Help:      "The total number of cache scan keys",
+	})
 )
