@@ -276,10 +276,12 @@ func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 				p.Logger.Debug("Failed to scan keys", "error", scanResult.Err())
 				break
 			}
+			CacheScanCounter.Inc()
 
 			// Per each key, delete the cache entry and the table cache key itself.
 			var keys []string
 			keys, cursor = scanResult.Val()
+			CacheScanKeysCounter.Add(float64(len(keys)))
 			for _, tableKey := range keys {
 				// Invalidate the cache for the table.
 				cachedRespnseKey := strings.TrimPrefix(tableKey, table+":")
