@@ -247,12 +247,11 @@ func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 	p.Logger.Trace("Query message", "query", queryMessage)
 
 	queryString := strings.ToUpper(queryMessage["String"])
-	// TODO: Add change detection for all changes to DB, not just for the DMLs.
-	// https://github.com/gatewayd-io/gatewayd-plugin-cache/issues/19
-	if !strings.HasPrefix(queryString, "UPDATE") ||
-		!strings.HasPrefix(queryString, "INSERT") ||
-		!strings.HasPrefix(queryString, "DELETE") {
-		p.Logger.Debug("Query is not a DML. Skipping invalidation")
+	// Ignore SELECT and WITH/SELECT queries.
+	// TODO: This is a naive approach, but query parsing has a cost.
+	if strings.HasPrefix(queryString, "SELECT") ||
+		(strings.HasPrefix(queryString, "WITH") &&
+			strings.Contains(queryString, "SELECT")) {
 		return
 	}
 
