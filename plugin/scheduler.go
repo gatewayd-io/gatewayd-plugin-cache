@@ -28,9 +28,11 @@ func (p *Plugin) PeriodicInvalidator() {
 				p.Logger.Error("Failed to scan keys", "error", scanResult.Err())
 				break
 			}
+			CacheScanCounter.Inc()
 
 			var addresses []string
 			addresses, cursor = scanResult.Val()
+			CacheScanKeysCounter.Add(float64(len(addresses)))
 			for _, address := range addresses {
 				valid := false
 
