@@ -65,6 +65,7 @@ func (p *CachePlugin) GRPCClient(_ context.Context, _ *goplugin.GRPCBroker, c *g
 func (p *Plugin) GetPluginConfig(
 	_ context.Context, _ *structpb.Struct,
 ) (*structpb.Struct, error) {
+	GetPluginConfigCounter.Inc()
 	return structpb.NewStruct(PluginConfig)
 }
 
@@ -72,6 +73,7 @@ func (p *Plugin) GetPluginConfig(
 func (p *Plugin) OnTrafficFromClient(
 	ctx context.Context, req *structpb.Struct,
 ) (*structpb.Struct, error) {
+	OnTrafficFromClientCounter.Inc()
 	req, err := postgres.HandleClientMessage(req, p.Logger)
 	if err != nil {
 		p.Logger.Info("Failed to handle client message", "error", err)
@@ -147,6 +149,7 @@ func (p *Plugin) OnTrafficFromClient(
 func (p *Plugin) OnTrafficFromServer(
 	ctx context.Context, resp *structpb.Struct,
 ) (*structpb.Struct, error) {
+	OnTrafficFromServerCounter.Inc()
 	resp, err := postgres.HandleServerMessage(resp, p.Logger)
 	if err != nil {
 		p.Logger.Info("Failed to handle server message", "error", err)
@@ -221,6 +224,7 @@ func (p *Plugin) OnTrafficFromServer(
 }
 
 func (p *Plugin) OnClosed(ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
+	OnClosedCounter.Inc()
 	client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
 	if client != nil {
 		if err := p.RedisClient.Del(ctx, client["remote"]).Err(); err != nil {

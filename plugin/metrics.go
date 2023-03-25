@@ -7,6 +7,27 @@ import (
 )
 
 var (
+	GetPluginConfigCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: metrics.Namespace,
+		Name:      "get_plugin_config_total",
+		Help:      "The total number of calls to the getPluginConfig method",
+	})
+	OnClosedCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: metrics.Namespace,
+		Name:      "on_closed_total",
+		Help:      "The total number of calls to the onClosed method",
+	})
+	OnTrafficFromClientCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: metrics.Namespace,
+		Name:      "on_traffic_from_client_total",
+		Help:      "The total number of calls to the onTrafficFromClient method",
+	})
+	OnTrafficFromServerCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: metrics.Namespace,
+		Name:      "on_traffic_from_server_total",
+		Help:      "The total number of calls to the onTrafficFromServer method",
+	})
+
 	CacheHitsCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: metrics.Namespace,
 		Name:      "cache_hits_total",
