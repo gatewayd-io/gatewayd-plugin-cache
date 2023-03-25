@@ -5,14 +5,18 @@ GatewayD plugin for caching query results.
 ## Features
 
 - Basic caching of database responses to client queries
-- Invalidate cached responses on upsert and delete (table-based)
-- Periodic cache invalidation
+- Invalidate cached responses by parsing incoming queries (table-based):
+  - **DML**: INSERT, UPDATE and DELETE
+  - **Multi-statements**: UNION, INTERSECT and EXCEPT
+  - **DDL**: TRUNCATE, DROP and ALTER
+  - **WITH clause**
+  - **Multiple queries** (delimited by semicolon)
+- Periodic cache invalidation for invalidating stale client keys
 - Support for setting expiry time on cached data
 - Support for caching responses from multiple databases on multiple servers
-- Support nested queries: joins, unions, multi-table selects, and the like
-- Support for invalidating cache based on truncate, drop and alter statements
 - Detect client's chosen database from the client's startup message
-- Metrics for quantifying cache hits, misses, gets, sets and deletes
+- Prometheus metrics for quantifying cache hits, misses, gets, sets, deletes and scan
+- Prometheus metrics for counting total RPC method calls
 - Logging at various levels
 - Configurable via environment variables
 
