@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/alicebob/miniredis/v2 v2.30.1
-	github.com/gatewayd-io/gatewayd-plugin-sdk v0.0.18
+	github.com/gatewayd-io/gatewayd-plugin-sdk v0.0.19
 	github.com/go-co-op/gocron v1.19.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/hashicorp/go-hclog v1.5.0
@@ -43,6 +43,6 @@ require (
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
-	google.golang.org/genproto v0.0.0-20230323212658-478b75c54725 // indirect
+	google.golang.org/genproto v0.0.0-20230331144136-dcfb400f0633 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
