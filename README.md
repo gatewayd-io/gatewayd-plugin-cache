@@ -15,9 +15,9 @@ GatewayD plugin for caching query results.
 - Support for setting expiry time on cached data
 - Support for caching responses from multiple databases on multiple servers
 - Detect client's chosen database from the client's startup message
-- Prometheus metrics for quantifying cache hits, misses, gets, sets, deletes and scan
+- Prometheus metrics for quantifying cache hits, misses, gets, sets, deletes and scans
 - Prometheus metrics for counting total RPC method calls
-- Logging at various levels
+- Logging
 - Configurable via environment variables
 
 ## Build for testing
