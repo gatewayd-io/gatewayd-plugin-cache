@@ -135,10 +135,9 @@ func (p *Plugin) OnTrafficFromClient(
 		if response != "" {
 			CacheHitsCounter.Inc()
 			// The response is cached.
-			return structpb.NewStruct(map[string]interface{}{
-				"terminate": true,
-				"response":  response,
-			})
+			req.Fields["response"] = structpb.NewStringValue(response)
+			req.Fields["terminate"] = structpb.NewBoolValue(true)
+			return req, nil
 		}
 	}
 
