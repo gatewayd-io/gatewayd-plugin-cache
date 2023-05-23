@@ -3,8 +3,12 @@
 verificationPolicy: "passdown"
 compatibilityPolicy: "strict"
 acceptancePolicy: "accept"
+terminationPolicy: "stop"
+enableMetricsMerger: True
 metricsMergerPeriod: 5s
 healthCheckPeriod: 5s
+reloadOnCrash: True
+timeout: 30s
 
 plugins:
   - name: gatewayd-plugin-cache
