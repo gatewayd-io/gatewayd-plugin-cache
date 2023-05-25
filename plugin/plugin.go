@@ -24,11 +24,12 @@ type Plugin struct {
 	Logger hclog.Logger
 
 	// Cache configuration.
-	RedisClient   *goRedis.Client
-	RedisURL      string
-	Expiry        time.Duration
-	DefaultDBName string
-	ScanCount     int64
+	RedisClient        *goRedis.Client
+	RedisURL           string
+	Expiry             time.Duration
+	DefaultDBName      string
+	ScanCount          int64
+	ExitOnStartupError bool
 
 	// Periodic invalidator configuration.
 	PeriodicInvalidatorEnabled    bool
