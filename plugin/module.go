@@ -43,7 +43,8 @@ var (
 				"PERIODIC_INVALIDATOR_START_DELAY", "1m"),
 			"periodicInvalidatorInterval": sdkConfig.GetEnv(
 				"PERIODIC_INVALIDATOR_INTERVAL", "1m"),
-			"apiAddress": sdkConfig.GetEnv("API_ADDRESS", "localhost:8080"),
+			"apiAddress":         sdkConfig.GetEnv("API_ADDRESS", "localhost:8080"),
+			"exitOnStartupError": sdkConfig.GetEnv("EXIT_ON_STARTUP_ERROR", "false"),
 		},
 		"hooks": []interface{}{
 			int32(v1.HookName_HOOK_NAME_ON_CLOSED),

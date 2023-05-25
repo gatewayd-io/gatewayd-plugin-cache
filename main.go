@@ -33,6 +33,7 @@ func main() {
 	})
 
 	var metricsConfig *metrics.MetricsConfig
+	//nolint:nestif
 	if cfg := cast.ToStringMap(plugin.PluginConfig["config"]); cfg != nil {
 		metricsConfig = metrics.NewMetricsConfig(cfg)
 		if metricsConfig != nil && metricsConfig.Enabled {
@@ -43,11 +44,15 @@ func main() {
 		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
 		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
 		pluginInstance.Impl.ScanCount = cast.ToInt64(cfg["scanCount"])
+		pluginInstance.Impl.ExitOnStartupError = cast.ToBool(cfg["exitOnStartupError"])
 
 		redisConfig, err := redis.ParseURL(pluginInstance.Impl.RedisURL)
 		if err != nil {
 			logger.Error("Failed to parse Redis URL", "error", err)
-			os.Exit(1)
+			if pluginInstance.Impl.ExitOnStartupError {
+				logger.Info("Exiting due to startup error")
+				os.Exit(1)
+			}
 		}
 
 		pluginInstance.Impl.RedisClient = redis.NewClient(redisConfig)
@@ -55,8 +60,11 @@ func main() {
 		// Ping the Redis server to check if it is available.
 		_, err = pluginInstance.Impl.RedisClient.Ping(context.Background()).Result()
 		if err != nil {
-			logger.Error("Failed to ping Redis server, plugin exited", "error", err)
-			os.Exit(1)
+			logger.Error("Failed to ping Redis server", "error", err)
+			if pluginInstance.Impl.ExitOnStartupError {
+				logger.Info("Exiting due to startup error")
+				os.Exit(1)
+			}
 		}
 
 		pluginInstance.Impl.PeriodicInvalidatorEnabled = cast.ToBool(
