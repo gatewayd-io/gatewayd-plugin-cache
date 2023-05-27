@@ -1,6 +1,6 @@
 # gatewayd-plugin-cache
 
-GatewayD plugin for caching query results.
+GatewayD plugin for caching query results. For more information, see the [docs](https://gatewayd.io/docs/plugins/gatewayd-plugin-cache) for this plugin.
 
 ## Features
 
