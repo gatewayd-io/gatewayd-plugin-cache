@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
 	"os"
 
 	"github.com/gatewayd-io/gatewayd-plugin-cache/plugin"
@@ -10,6 +11,7 @@ import (
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/metrics"
 	p "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
+	"github.com/getsentry/sentry-go"
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
@@ -17,6 +19,16 @@ import (
 )
 
 func main() {
+	sentryDSN := sdkConfig.GetEnv("SENTRY_DSN", "")
+	// Initialize Sentry SDK
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:              sentryDSN,
+		TracesSampleRate: 1.0,
+	})
+	if err != nil {
+		log.Fatalf("Failed to initialize Sentry SDK: %s", err.Error())
+	}
+
 	// Parse command line flags, passed by GatewayD via the plugin config
 	logLevel := flag.String("log-level", "info", "Log level")
 	flag.Parse()

@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/alicebob/miniredis/v2 v2.30.1
 	github.com/gatewayd-io/gatewayd-plugin-sdk v0.0.19
+	github.com/getsentry/sentry-go v0.21.0
 	github.com/go-co-op/gocron v1.19.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/hashicorp/go-hclog v1.5.0
