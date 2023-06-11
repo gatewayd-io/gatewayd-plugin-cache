@@ -19,9 +19,10 @@ import (
 )
 
 func main() {
+	sentryDSN := sdkConfig.GetEnv("SENTRY_DSN", "")
 	// Initialize Sentry SDK
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              "https://70eb1abcd32e41acbdfc17bc3407a543@o4504550475038720.ingest.sentry.io/4505342961123328",
+		Dsn:              sentryDSN,
 		TracesSampleRate: 1.0,
 	})
 	if err != nil {
