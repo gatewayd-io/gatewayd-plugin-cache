@@ -1,11 +1,16 @@
 <p align="center">
-  <a href="https://gatewayd.io/docs/plugins/gatewayd-plugin-cache">
+  <a href="https://docs.gatewayd.io/plugins/gatewayd-plugin-cache">
     <picture>
       <img alt="gatewayd-plugin-cache-logo" src="https://github.com/gatewayd-io/gatewayd-plugin-cache/blob/main/assets/gatewayd-plugin-cache-logo.png" width="96" />
     </picture>
   </a>
   <h3 align="center">gatewayd-plugin-cache</h3>
   <p align="center">GatewayD plugin for caching query results.</p>
+</p>
+
+<p align="center">
+    <a href="https://github.com/gatewayd-io/gatewayd-plugin-cache/releases">Download</a> ·
+    <a href="https://docs.gatewayd.io/plugins/gatewayd-plugin-cache">Documentation</a>
 </p>
 
 ## Features
