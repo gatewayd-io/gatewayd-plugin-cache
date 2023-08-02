@@ -73,4 +73,8 @@ build-windows-arm64:
 	@zip -r dist/gatewayd-plugin-cache-windows-arm64-${VERSION}.zip -j ./dist/windows-arm64/ ${FILES}
 	@sha256sum dist/gatewayd-plugin-cache-windows-arm64-${VERSION}.zip | sed 's/dist\///g' >> dist/checksums.txt
 
-build-release: tidy create-build-dir build-linux-amd64 build-linux-arm64
+build-release-linux: tidy create-build-dir build-linux-amd64 build-linux-arm64
+
+build-release-darwin: tidy create-build-dir build-darwin-amd64 build-darwin-arm64
+
+build-release-windows: tidy create-build-dir build-windows-amd64 build-windows-arm64
