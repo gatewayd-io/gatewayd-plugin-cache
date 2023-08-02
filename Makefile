@@ -41,4 +41,40 @@ build-linux-arm64:
 	@tar czf dist/gatewayd-plugin-cache-linux-arm64-${VERSION}.tar.gz -C ./dist/linux-arm64/ ${FILES}
 	@sha256sum dist/gatewayd-plugin-cache-linux-arm64-${VERSION}.tar.gz | sed 's/dist\///g' >> dist/checksums.txt
 
-build-release: tidy create-build-dir build-linux-amd64 build-linux-arm64
+build-darwin-amd64:
+	@echo "Building gatewayd ${VERSION} for darwin-arm64"
+	@mkdir -p dist/darwin-amd64
+	@GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w ${EXTRA_LDFLAGS}" -o dist/darwin-amd64/gatewayd-plugin-cache
+	@shasum -a 256 dist/darwin-amd64/gatewayd-plugin-cache | sed 's/dist\/darwin-amd64\///g' >> dist/darwin-amd64/checksum.txt
+	@tar czf dist/gatewayd-plugin-cache-darwin-amd64-${VERSION}.tar.gz -C ./dist/darwin-amd64/ ${FILES}
+	@shasum -a 256 dist/gatewayd-plugin-cache-darwin-amd64-${VERSION}.tar.gz | sed 's/dist\///g' >> dist/checksums.txt
+
+build-darwin-arm64:
+	@echo "Building gatewayd ${VERSION} for darwin-arm64"
+	@mkdir -p dist/darwin-arm64
+	@GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w ${EXTRA_LDFLAGS}" -o dist/darwin-arm64/gatewayd-plugin-cache
+	@shasum -a 256 dist/darwin-arm64/gatewayd-plugin-cache | sed 's/dist\/darwin-arm64\///g' >> dist/darwin-arm64/checksum.txt
+	@tar czf dist/gatewayd-plugin-cache-darwin-arm64-${VERSION}.tar.gz -C ./dist/darwin-arm64/ ${FILES}
+	@shasum -a 256 dist/gatewayd-plugin-cache-darwin-arm64-${VERSION}.tar.gz | sed 's/dist\///g' >> dist/checksums.txt
+
+build-windows-amd64:
+	@echo "Building gatewayd ${VERSION} for windows-amd64"
+	@mkdir -p dist/windows-amd64
+	@GOOS=windows GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w ${EXTRA_LDFLAGS}" -o dist/windows-amd64/gatewayd-plugin-cache.exe
+	@sha256sum dist/windows-amd64/gatewayd-plugin-cache.exe | sed 's/dist\/windows-amd64\///g' >> dist/windows-amd64/checksum.txt
+	@zip -r dist/gatewayd-plugin-cache-windows-amd64-${VERSION}.zip -j ./dist/windows-amd64/ ${FILES}
+	@sha256sum dist/gatewayd-plugin-cache-windows-amd64-${VERSION}.zip | sed 's/dist\///g' >> dist/checksums.txt
+
+build-windows-arm64:
+	@echo "Building gatewayd ${VERSION} for windows-arm64"
+	@mkdir -p dist/windows-arm64
+	@GOOS=windows GOARCH=arm64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w ${EXTRA_LDFLAGS}" -o dist/windows-arm64/gatewayd-plugin-cache.exe
+	@sha256sum dist/windows-arm64/gatewayd-plugin-cache.exe | sed 's/dist\/windows-arm64\///g' >> dist/windows-arm64/checksum.txt
+	@zip -r dist/gatewayd-plugin-cache-windows-arm64-${VERSION}.zip -j ./dist/windows-arm64/ ${FILES}
+	@sha256sum dist/gatewayd-plugin-cache-windows-arm64-${VERSION}.zip | sed 's/dist\///g' >> dist/checksums.txt
+
+build-release-linux: tidy create-build-dir build-linux-amd64 build-linux-arm64
+
+build-release-darwin: tidy create-build-dir build-darwin-amd64 build-darwin-arm64
+
+build-release-windows: tidy create-build-dir build-windows-amd64 build-windows-arm64
