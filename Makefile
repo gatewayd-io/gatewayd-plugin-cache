@@ -78,3 +78,11 @@ build-release-linux: tidy create-build-dir build-linux-amd64 build-linux-arm64
 build-release-darwin: tidy create-build-dir build-darwin-amd64 build-darwin-arm64
 
 build-release-windows: tidy create-build-dir build-windows-amd64 build-windows-arm64
+
+generate-release-checksums:
+	@sha256sum gatewayd-plugin-cache-linux-amd64-${VERSION}.tar.gz > checksums.txt
+	@sha256sum gatewayd-plugin-cache-linux-arm64-${VERSION}.tar.gz >> checksums.txt
+	@sha256sum gatewayd-plugin-cache-darwin-amd64-${VERSION}.tar.gz >> checksums.txt
+	@sha256sum gatewayd-plugin-cache-darwin-arm64-${VERSION}.tar.gz >> checksums.txt
+	# @sha256sum gatewayd-plugin-cache-windows-amd64-${VERSION}.zip >> checksums.txt
+	# @sha256sum gatewayd-plugin-cache-windows-arm64-${VERSION}.zip >> checksums.txt

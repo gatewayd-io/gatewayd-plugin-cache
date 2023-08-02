@@ -3,96 +3,100 @@ name: Build and release gatewayd-plugin-cache
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release-linux:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # Windows build is disabled due to the following issue:
+        # https://github.com/gatewayd-io/gatewayd-plugin-cache/issues/58
+        os: [ubuntu-latest, macos-latest] #, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Go 1.20
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.20"
+          cache: true
+      # - name: Set up git and download dependencies
+      #   if: matrix.os == 'windows-latest'
+      #   run: |
+      #     git config --global url."https://mostafa:%TOKEN%@github.com/".insteadOf "https://github.com"
+      #     go mod tidy
+      - name: Set up git and download dependencies
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        run: |
+          git config --global url."https://mostafa:${TOKEN}@github.com/".insteadOf "https://github.com"
+          go mod tidy
+        env:
+          TOKEN: ${{ secrets.GH_SDK_TOKEN }}
+          GOPRIVATE: github.com/gatewayd-io/gatewayd-*
+      - name: Install dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Build and release binaries
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            make build-release-linux
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            make build-release-darwin
+          fi
+      # - name: Build and release binaries
+      #   if: matrix.os == 'windows-latest'
+      #   run: |
+      #     make build-release-windows
+      - name: Upload binaries and checksums
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          path: dist/*.tar.gz
+          name: dist-${{ matrix.os }}
+          if-no-files-found: warn
+      # - name: Upload binaries and checksums
+      #   if: matrix.os == 'windows-latest'
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     path: dist/*.zip
+      #     name: dist-${{ matrix.os }}
+      #     if-no-files-found: warn
+  release:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Set up Go 1.20
-        uses: actions/setup-go@v3
+      # - name: Download binaries and checksums for Windows
+      #   uses: actions/download-artifact@v3
+      #   with:
+      #     name: dist-windows-latest
+      - name: Download binaries and checksums for Linux
+        uses: actions/download-artifact@v3
         with:
-          go-version: '1.20'
-          cache: true
-      - run: |
-          git config --global url."https://mostafa:${TOKEN}@github.com/".insteadOf "https://github.com"
-          go mod tidy
-        env:
-          TOKEN: ${{ secrets.GH_SDK_TOKEN }}
-          GOPRIVATE: github.com/gatewayd-io/gatewayd-*
-      - name: Build and release binaries
-        run: make build-release-linux
+          name: dist-ubuntu-latest
+      - name: Download binaries and checksums for macOS
+        uses: actions/download-artifact@v3
+        with:
+          name: dist-macos-latest
+      - name: Generate release checksums
+        run: make generate-release-checksums
       - name: Create release and add artifacts
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/*.tar.gz
-            dist/checksums.txt
-          draft: false
-          prerelease: false
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          generate_release_notes: true
-  build-and-release-darwin:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Set up Go 1.20
-        uses: actions/setup-go@v3
-        with:
-          go-version: '1.20'
-          cache: true
-      - run: |
-          go mod tidy
-        env:
-          GOPRIVATE: github.com/gatewayd-io/gatewayd-*
-      - name: Build and release binaries
-        run: make build-release-darwin
-      - name: Create release and add artifacts
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            dist/*.tar.gz
-            dist/checksums.txt
-          draft: false
-          prerelease: false
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          generate_release_notes: true
-  build-and-release-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Set up Go 1.20
-        uses: actions/setup-go@v3
-        with:
-          go-version: '1.20'
-          cache: true
-      - run: |
-          go mod tidy
-        env:
-          GOPRIVATE: github.com/gatewayd-io/gatewayd-*
-      - name: Build and release binaries
-        run: make build-release-windows
-      - name: Create release and add artifacts
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            dist/*.zip
-            dist/checksums.txt
+            *.tar.gz
+            checksums.txt
+          # *.zip
           draft: false
           prerelease: false
           tag_name: ${{ github.ref_name }}
