@@ -14,7 +14,6 @@ import (
 	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/spf13/cast"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type Plugin struct {
@@ -64,16 +63,16 @@ func (p *CachePlugin) GRPCClient(_ context.Context, _ *goplugin.GRPCBroker, c *g
 
 // GetPluginConfig returns the plugin config.
 func (p *Plugin) GetPluginConfig(
-	_ context.Context, _ *structpb.Struct,
-) (*structpb.Struct, error) {
+	_ context.Context, _ *v1.Struct,
+) (*v1.Struct, error) {
 	GetPluginConfigCounter.Inc()
-	return structpb.NewStruct(PluginConfig)
+	return v1.NewStruct(PluginConfig)
 }
 
 // OnTrafficFromClient is called when a request is received by GatewayD from the client.
 func (p *Plugin) OnTrafficFromClient(
-	ctx context.Context, req *structpb.Struct,
-) (*structpb.Struct, error) {
+	ctx context.Context, req *v1.Struct,
+) (*v1.Struct, error) {
 	OnTrafficFromClientCounter.Inc()
 	req, err := postgres.HandleClientMessage(req, p.Logger)
 	if err != nil {
@@ -125,7 +124,7 @@ func (p *Plugin) OnTrafficFromClient(
 		p.invalidateDML(ctx, query)
 
 		// Check if the query is cached.
-		response, err := p.RedisClient.Get(ctx, cacheKey).Result()
+		response, err := p.RedisClient.Get(ctx, cacheKey).Bytes()
 		if err != nil {
 			CacheMissesCounter.Inc()
 			p.Logger.Debug("Failed to get cached response", "error", err)
@@ -133,11 +132,11 @@ func (p *Plugin) OnTrafficFromClient(
 		CacheGetsCounter.Inc()
 
 		// If the query is cached, return the cached response.
-		if response != "" {
+		if response != nil {
 			CacheHitsCounter.Inc()
 			// The response is cached.
-			req.Fields["response"] = structpb.NewStringValue(response)
-			req.Fields["terminate"] = structpb.NewBoolValue(true)
+			req.Fields["response"] = v1.NewBytesValue(response)
+			req.Fields["terminate"] = v1.NewBoolValue(true)
 			return req, nil
 		}
 	}
@@ -147,8 +146,8 @@ func (p *Plugin) OnTrafficFromClient(
 
 // OnTrafficFromServer is called when a response is received by GatewayD from the server.
 func (p *Plugin) OnTrafficFromServer(
-	ctx context.Context, resp *structpb.Struct,
-) (*structpb.Struct, error) {
+	ctx context.Context, resp *v1.Struct,
+) (*v1.Struct, error) {
 	OnTrafficFromServerCounter.Inc()
 	resp, err := postgres.HandleServerMessage(resp, p.Logger)
 	if err != nil {
@@ -158,8 +157,14 @@ func (p *Plugin) OnTrafficFromServer(
 	rowDescription := cast.ToString(sdkPlugin.GetAttr(resp, "rowDescription", ""))
 	dataRow := cast.ToStringSlice(sdkPlugin.GetAttr(resp, "dataRow", []interface{}{}))
 	errorResponse := cast.ToString(sdkPlugin.GetAttr(resp, "errorResponse", ""))
-	request := cast.ToString(sdkPlugin.GetAttr(resp, "request", ""))
-	response := cast.ToString(sdkPlugin.GetAttr(resp, "response", ""))
+	request, ok := sdkPlugin.GetAttr(resp, "request", nil).([]byte)
+	if !ok {
+		request = []byte{}
+	}
+	response, ok := sdkPlugin.GetAttr(resp, "response", nil).([]byte)
+	if !ok {
+		response = []byte{}
+	}
 	server := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "server", ""))
 
 	// This is used as a fallback if the database is not found in the startup message.
@@ -185,7 +190,7 @@ func (p *Plugin) OnTrafficFromServer(
 		return resp, nil
 	}
 
-	cacheKey := strings.Join([]string{server["remote"], database, request}, ":")
+	cacheKey := strings.Join([]string{server["remote"], database, string(request)}, ":")
 	if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
 		// The request was successful and the response contains data. Cache the response.
 		if err := p.RedisClient.Set(ctx, cacheKey, response, p.Expiry).Err(); err != nil {
@@ -223,7 +228,7 @@ func (p *Plugin) OnTrafficFromServer(
 	return resp, nil
 }
 
-func (p *Plugin) OnClosed(ctx context.Context, req *structpb.Struct) (*structpb.Struct, error) {
+func (p *Plugin) OnClosed(ctx context.Context, req *v1.Struct) (*v1.Struct, error) {
 	OnClosedCounter.Inc()
 	client := cast.ToStringMapString(sdkPlugin.GetAttr(req, "client", nil))
 	if client != nil {
@@ -316,7 +321,7 @@ func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 // getDBFromStartupMessage gets the database name from the startup message.
 func (p *Plugin) getDBFromStartupMessage(
 	ctx context.Context,
-	req *structpb.Struct,
+	req *v1.Struct,
 	database string,
 	client map[string]string,
 ) string {

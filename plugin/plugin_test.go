@@ -8,21 +8,21 @@ import (
 
 	miniredis "github.com/alicebob/miniredis/v2"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
+	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	pgproto3 "github.com/jackc/pgx/v5/pgproto3"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func testQueryRequest() (string, string) {
+func testQueryRequest() (string, []byte) {
 	query := "SELECT * FROM users"
 	queryMsg := pgproto3.Query{String: query}
 	// Encode the data to base64.
-	return query, base64.StdEncoding.EncodeToString(queryMsg.Encode(nil))
+	return query, queryMsg.Encode(nil)
 }
 
-func testStartupRequest() string {
+func testStartupRequest() []byte {
 	startupMsg := pgproto3.StartupMessage{
 		ProtocolVersion: 196608,
 		Parameters: map[string]string{
@@ -30,7 +30,7 @@ func testStartupRequest() string {
 			"database": "postgres",
 		},
 	}
-	return base64.StdEncoding.EncodeToString(startupMsg.Encode(nil))
+	return startupMsg.Encode(nil)
 }
 
 func Test_Plugin(t *testing.T) {
@@ -72,9 +72,8 @@ func Test_Plugin(t *testing.T) {
 	assert.Equal(t, configMap["categories"], PluginConfig["categories"])
 
 	// Test the plugin's OnTrafficFromClient method with a StartupMessage.
-	startupReq := testStartupRequest()
 	args := map[string]interface{}{
-		"request": startupReq,
+		"request": testStartupRequest(),
 		"client": map[string]interface{}{
 			"local":  "localhost:15432",
 			"remote": "localhost:45320",
@@ -85,7 +84,7 @@ func Test_Plugin(t *testing.T) {
 		},
 		"error": "",
 	}
-	req, err := structpb.NewStruct(args)
+	req, err := v1.NewStruct(args)
 	assert.Nil(t, err)
 	result, err := p.Impl.OnTrafficFromClient(context.Background(), req)
 	assert.Nil(t, err)
@@ -110,7 +109,7 @@ func Test_Plugin(t *testing.T) {
 		},
 		"error": "",
 	}
-	req, err = structpb.NewStruct(args)
+	req, err = v1.NewStruct(args)
 	assert.Nil(t, err)
 	result, err = p.Impl.OnTrafficFromClient(context.Background(), req)
 	assert.Nil(t, err)
@@ -125,7 +124,8 @@ func Test_Plugin(t *testing.T) {
 		1
 		(1 row)
 	*/
-	response := "VAAAABsAAWlkAAAAQAQAAQAAABcABP////8AAEQAAAALAAEAAAABMUMAAAANU0VMRUNUIDEAWgAAAAVJ"
+	response, err := base64.StdEncoding.DecodeString("VAAAABsAAWlkAAAAQAQAAQAAABcABP////8AAEQAAAALAAEAAAABMUMAAAANU0VMRUNUIDEAWgAAAAVJ")
+	assert.Nil(t, err)
 	args = map[string]interface{}{
 		"request":  request,
 		"response": response,
@@ -139,7 +139,7 @@ func Test_Plugin(t *testing.T) {
 		},
 		"error": "",
 	}
-	resp, err := structpb.NewStruct(args)
+	resp, err := v1.NewStruct(args)
 	assert.Nil(t, err)
 	result, err = p.Impl.OnTrafficFromServer(context.Background(), resp)
 	assert.Nil(t, err)
@@ -147,8 +147,9 @@ func Test_Plugin(t *testing.T) {
 	assert.Equal(t, result, resp)
 
 	// Check that the query and response was cached.
-	cachedResponse := redisClient.Get(
-		context.Background(), "localhost:5432:postgres:"+request).Val()
+	cachedResponse, err := redisClient.Get(
+		context.Background(), "localhost:5432:postgres:"+string(request)).Bytes()
+	assert.Nil(t, err)
 	assert.Equal(t, cachedResponse, response)
 
 	// Test the plugin's OnTrafficFromClient method with a cached response.
