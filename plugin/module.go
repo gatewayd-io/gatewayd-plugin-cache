@@ -13,13 +13,13 @@ var (
 		RemoteUrl: "github.com/gatewayd-io/gatewayd-plugin-cache",
 	}
 	PluginMap = map[string]goplugin.Plugin{
-		PluginID.Name: &CachePlugin{},
+		PluginID.GetName(): &CachePlugin{},
 	}
 	PluginConfig = map[string]interface{}{
 		"id": map[string]interface{}{
-			"name":      PluginID.Name,
-			"version":   PluginID.Version,
-			"remoteUrl": PluginID.RemoteUrl,
+			"name":      PluginID.GetName(),
+			"version":   PluginID.GetVersion(),
+			"remoteUrl": PluginID.GetRemoteUrl(),
 		},
 		"description": "GatewayD plugin for caching query results",
 		"authors": []interface{}{
