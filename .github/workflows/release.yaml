@@ -13,9 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # Windows build is disabled due to the following issue:
-        # https://github.com/gatewayd-io/gatewayd-plugin-cache/issues/58
-        os: [ubuntu-latest, macos-latest] #, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -37,10 +35,10 @@ jobs:
           elif [ "$RUNNER_OS" == "macOS" ]; then
             make build-release-darwin
           fi
-      # - name: Build and release binaries
-      #   if: matrix.os == 'windows-latest'
-      #   run: |
-      #     make build-release-windows
+      - name: Build and release binaries
+        if: matrix.os == 'windows-latest'
+        run: |
+          make build-release-windows
       - name: Upload binaries and checksums
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v3
@@ -48,13 +46,13 @@ jobs:
           path: dist/*.tar.gz
           name: dist-${{ matrix.os }}
           if-no-files-found: warn
-      # - name: Upload binaries and checksums
-      #   if: matrix.os == 'windows-latest'
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     path: dist/*.zip
-      #     name: dist-${{ matrix.os }}
-      #     if-no-files-found: warn
+      - name: Upload binaries and checksums
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          path: dist/*.zip
+          name: dist-${{ matrix.os }}
+          if-no-files-found: warn
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -63,10 +61,10 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      # - name: Download binaries and checksums for Windows
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: dist-windows-latest
+      - name: Download binaries and checksums for Windows
+        uses: actions/download-artifact@v3
+        with:
+          name: dist-windows-latest
       - name: Download binaries and checksums for Linux
         uses: actions/download-artifact@v3
         with:
@@ -83,7 +81,7 @@ jobs:
           files: |
             *.tar.gz
             checksums.txt
-          # *.zip
+            *.zip
           draft: false
           prerelease: false
           tag_name: ${{ github.ref_name }}
