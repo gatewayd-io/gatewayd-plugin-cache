@@ -9,11 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+  build-and-release:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -25,54 +22,10 @@ jobs:
           go-version: "1.20"
           cache: true
       - name: Install dependencies
-        if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
       - name: Build and release binaries
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            make build-release-linux
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            make build-release-darwin
-          fi
-      - name: Build and release binaries
-        if: matrix.os == 'windows-latest'
-        run: |
-          make build-release-windows
-      - name: Upload binaries and checksums
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v3
-        with:
-          path: dist/*.tar.gz
-          name: dist-${{ matrix.os }}
-          if-no-files-found: warn
-      - name: Upload binaries and checksums
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v3
-        with:
-          path: dist/*.zip
-          name: dist-${{ matrix.os }}
-          if-no-files-found: warn
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Download binaries and checksums for Windows
-        uses: actions/download-artifact@v3
-        with:
-          name: dist-windows-latest
-      - name: Download binaries and checksums for Linux
-        uses: actions/download-artifact@v3
-        with:
-          name: dist-ubuntu-latest
-      - name: Download binaries and checksums for macOS
-        uses: actions/download-artifact@v3
-        with:
-          name: dist-macos-latest
+          make build-release
       - name: Generate release checksums
         run: make generate-release-checksums
       - name: Create release and add artifacts
