@@ -30,9 +30,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            *.tar.gz
-            checksums.txt
-            *.zip
+            dist/*.tar.gz
+            dist/checksums.txt
+            dist/*.zip
           draft: false
           prerelease: false
           tag_name: ${{ github.ref_name }}
