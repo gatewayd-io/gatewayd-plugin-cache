@@ -26,8 +26,6 @@ jobs:
       - name: Build and release binaries
         run: |
           make build-release
-      - name: Generate release checksums
-        run: make generate-release-checksums
       - name: Create release and add artifacts
         uses: softprops/action-gh-release@v1
         with:
