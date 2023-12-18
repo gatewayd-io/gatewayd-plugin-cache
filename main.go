@@ -52,6 +52,9 @@ func main() {
 			go metrics.ExposeMetrics(metricsConfig, logger)
 		}
 
+		pluginInstance.Impl.UpdateCacheChannel = make(chan plugin.UpdateCacheRequest, 1000)
+		go pluginInstance.Impl.UpdateCache(context.Background())
+
 		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
 		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
 		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
