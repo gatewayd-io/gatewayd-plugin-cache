@@ -3,9 +3,6 @@ package plugin
 import (
 	"context"
 	"encoding/base64"
-	"os"
-	"testing"
-
 	miniredis "github.com/alicebob/miniredis/v2"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
@@ -13,6 +10,9 @@ import (
 	"github.com/hashicorp/go-hclog"
 	pgproto3 "github.com/jackc/pgx/v5/pgproto3"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"sync"
+	"testing"
 )
 
 func testQueryRequest() (string, []byte) {
@@ -44,16 +44,28 @@ func Test_Plugin(t *testing.T) {
 	redisClient := redis.NewClient(redisConfig)
 	assert.NotNil(t, redisClient)
 
+	updateCacheChannel := make(chan UpdateCacheRequest, 10)
+
 	// Create and initialize a new plugin.
 	logger := hclog.New(&hclog.LoggerOptions{
 		Level:  logging.GetLogLevel("error"),
 		Output: os.Stdout,
 	})
 	p := NewCachePlugin(Plugin{
-		Logger:      logger,
-		RedisURL:    redisURL,
-		RedisClient: redisClient,
+		Logger:             logger,
+		RedisURL:           redisURL,
+		RedisClient:        redisClient,
+		UpdateCacheChannel: updateCacheChannel,
 	})
+
+	// Use a WaitGroup to wait for the goroutine to finish
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		p.Impl.UpdateCache(context.Background())
+	}()
+
 	assert.NotNil(t, p)
 
 	// Test the plugin's GetPluginConfig method.
@@ -145,6 +157,10 @@ func Test_Plugin(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, result, resp)
+
+	// Close the channel and wait for the cache updater to return gracefully
+	close(updateCacheChannel)
+	wg.Wait()
 
 	// Check that the query and response was cached.
 	cachedResponse, err := redisClient.Get(

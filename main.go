@@ -60,6 +60,7 @@ func main() {
 		}
 
 		pluginInstance.Impl.UpdateCacheChannel = make(chan plugin.UpdateCacheRequest, cacheBufferSize)
+		defer close(pluginInstance.Impl.UpdateCacheChannel)
 		go pluginInstance.Impl.UpdateCache(context.Background())
 
 		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
