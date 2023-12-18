@@ -164,13 +164,13 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 		rowDescription := cast.ToString(sdkPlugin.GetAttr(resp, "rowDescription", ""))
 		dataRow := cast.ToStringSlice(sdkPlugin.GetAttr(resp, "dataRow", []interface{}{}))
 		errorResponse := cast.ToString(sdkPlugin.GetAttr(resp, "errorResponse", ""))
-		request, ok := sdkPlugin.GetAttr(resp, "request", nil).([]byte)
-		if !ok {
+		request, isOk := sdkPlugin.GetAttr(resp, "request", nil).([]byte)
+		if !isOk {
 			request = []byte{}
 		}
 
-		response, ok := sdkPlugin.GetAttr(resp, "response", nil).([]byte)
-		if !ok {
+		response, isOk := sdkPlugin.GetAttr(resp, "response", nil).([]byte)
+		if !isOk {
 			response = []byte{}
 		}
 		server := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "server", ""))
@@ -194,8 +194,10 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 		// This might also happen if the cache is cleared while the client is still connected.
 		// In this case, the client should reconnect and the error will go away.
 		if database == "" {
-			p.Logger.Debug("Database name not found or set in cache, startup message or plugin config. Skipping cache")
-			p.Logger.Debug("Consider setting the database name in the plugin config or disabling the plugin if you don't need it")
+			p.Logger.Debug("Database name not found or set in cache, startup message or plugin config. " +
+				"Skipping cache")
+			p.Logger.Debug("Consider setting the database name in the " +
+				"plugin config or disabling the plugin if you don't need it")
 			return
 		}
 
@@ -238,7 +240,7 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 
 // OnTrafficFromServer is called when a response is received by GatewayD from the server.
 func (p *Plugin) OnTrafficFromServer(
-	ctx context.Context, resp *v1.Struct,
+	_ context.Context, resp *v1.Struct,
 ) (*v1.Struct, error) {
 	p.Logger.Info("Traffic is coming from the server side")
 	p.UpdateCacheChannel <- UpdateCacheRequest{

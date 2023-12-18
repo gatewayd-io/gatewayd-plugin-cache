@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/gatewayd-io/gatewayd-plugin-cache/plugin"
 	sdkConfig "github.com/gatewayd-io/gatewayd-plugin-sdk/config"
@@ -52,7 +53,13 @@ func main() {
 			go metrics.ExposeMetrics(metricsConfig, logger)
 		}
 
-		pluginInstance.Impl.UpdateCacheChannel = make(chan plugin.UpdateCacheRequest, 1000)
+		cacheBufferSizeStr := sdkConfig.GetEnv("CACHE_CHANNEL_BUFFER_SIZE", "100")
+		cacheBufferSize, err := strconv.Atoi(cacheBufferSizeStr)
+		if err != nil || cacheBufferSize <= 0 {
+			cacheBufferSize = 100 // default value
+		}
+
+		pluginInstance.Impl.UpdateCacheChannel = make(chan plugin.UpdateCacheRequest, cacheBufferSize)
 		go pluginInstance.Impl.UpdateCache(context.Background())
 
 		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
