@@ -146,10 +146,6 @@ func (p *Plugin) OnTrafficFromClient(
 	return req, nil
 }
 
-//type UpdateCacheRequest struct {
-//	serverResponse *v1.Struct
-//}
-
 func (p *Plugin) UpdateCache(ctx context.Context) {
 	for {
 		serverResponse, ok := <-p.UpdateCacheChannel
@@ -245,7 +241,7 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 func (p *Plugin) OnTrafficFromServer(
 	_ context.Context, resp *v1.Struct,
 ) (*v1.Struct, error) {
-	p.Logger.Info("Traffic is coming from the server side")
+	p.Logger.Debug("Traffic is coming from the server side")
 	p.UpdateCacheChannel <- resp
 	return resp, nil
 }
