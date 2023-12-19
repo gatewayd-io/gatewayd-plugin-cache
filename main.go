@@ -8,6 +8,7 @@ import (
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/metrics"
 	p "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
+	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	"github.com/getsentry/sentry-go"
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
@@ -56,7 +57,7 @@ func main() {
 			cacheBufferSize = 100 // default value
 		}
 
-		pluginInstance.Impl.UpdateCacheChannel = make(chan plugin.UpdateCacheRequest, cacheBufferSize)
+		pluginInstance.Impl.UpdateCacheChannel = make(chan *v1.Struct, cacheBufferSize)
 		go pluginInstance.Impl.UpdateCache(context.Background())
 
 		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])

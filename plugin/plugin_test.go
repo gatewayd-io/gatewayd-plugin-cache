@@ -44,7 +44,7 @@ func Test_Plugin(t *testing.T) {
 	redisClient := redis.NewClient(redisConfig)
 	assert.NotNil(t, redisClient)
 
-	updateCacheChannel := make(chan UpdateCacheRequest, 10)
+	updateCacheChannel := make(chan *v1.Struct, 10)
 
 	// Create and initialize a new plugin.
 	logger := hclog.New(&hclog.LoggerOptions{

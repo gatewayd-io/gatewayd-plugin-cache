@@ -30,7 +30,7 @@ type Plugin struct {
 	ScanCount          int64
 	ExitOnStartupError bool
 
-	UpdateCacheChannel chan UpdateCacheRequest
+	UpdateCacheChannel chan *v1.Struct
 
 	// Periodic invalidator configuration.
 	PeriodicInvalidatorEnabled    bool
@@ -146,18 +146,17 @@ func (p *Plugin) OnTrafficFromClient(
 	return req, nil
 }
 
-type UpdateCacheRequest struct {
-	serverResponse *v1.Struct
-}
+//type UpdateCacheRequest struct {
+//	serverResponse *v1.Struct
+//}
 
 func (p *Plugin) UpdateCache(ctx context.Context) {
 	for {
-		updateCacheRequest, ok := <-p.UpdateCacheChannel
+		serverResponse, ok := <-p.UpdateCacheChannel
 		if !ok {
 			p.Logger.Info("Channel closed, returning from function")
 			return
 		}
-		serverResponse := updateCacheRequest.serverResponse
 
 		OnTrafficFromServerCounter.Inc()
 		resp, err := postgres.HandleServerMessage(serverResponse, p.Logger)
@@ -247,9 +246,7 @@ func (p *Plugin) OnTrafficFromServer(
 	_ context.Context, resp *v1.Struct,
 ) (*v1.Struct, error) {
 	p.Logger.Info("Traffic is coming from the server side")
-	p.UpdateCacheChannel <- UpdateCacheRequest{
-		serverResponse: resp,
-	}
+	p.UpdateCacheChannel <- resp
 	return resp, nil
 }
 
