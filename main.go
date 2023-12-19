@@ -11,6 +11,7 @@ import (
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/metrics"
 	p "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
+	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	"github.com/getsentry/sentry-go"
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
@@ -52,6 +53,14 @@ func main() {
 			go metrics.ExposeMetrics(metricsConfig, logger)
 		}
 
+		cacheBufferSize := cast.ToUint(cfg["cacheBufferSize"])
+		if cacheBufferSize <= 0 {
+			cacheBufferSize = 100 // default value
+		}
+
+		pluginInstance.Impl.UpdateCacheChannel = make(chan *v1.Struct, cacheBufferSize)
+		go pluginInstance.Impl.UpdateCache(context.Background())
+
 		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
 		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
 		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
@@ -92,6 +101,8 @@ func main() {
 			pluginInstance.Impl.PeriodicInvalidator()
 		}
 	}
+
+	defer close(pluginInstance.Impl.UpdateCacheChannel)
 
 	goplugin.Serve(&goplugin.ServeConfig{
 		HandshakeConfig: goplugin.HandshakeConfig{

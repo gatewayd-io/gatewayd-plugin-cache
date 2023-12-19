@@ -30,6 +30,8 @@ type Plugin struct {
 	ScanCount          int64
 	ExitOnStartupError bool
 
+	UpdateCacheChannel chan *v1.Struct
+
 	// Periodic invalidator configuration.
 	PeriodicInvalidatorEnabled    bool
 	PeriodicInvalidatorStartDelay time.Duration
@@ -144,87 +146,103 @@ func (p *Plugin) OnTrafficFromClient(
 	return req, nil
 }
 
-// OnTrafficFromServer is called when a response is received by GatewayD from the server.
-func (p *Plugin) OnTrafficFromServer(
-	ctx context.Context, resp *v1.Struct,
-) (*v1.Struct, error) {
-	OnTrafficFromServerCounter.Inc()
-	resp, err := postgres.HandleServerMessage(resp, p.Logger)
-	if err != nil {
-		p.Logger.Info("Failed to handle server message", "error", err)
-	}
+func (p *Plugin) UpdateCache(ctx context.Context) {
+	for {
+		serverResponse, ok := <-p.UpdateCacheChannel
+		if !ok {
+			p.Logger.Info("Channel closed, returning from function")
+			return
+		}
 
-	rowDescription := cast.ToString(sdkPlugin.GetAttr(resp, "rowDescription", ""))
-	dataRow := cast.ToStringSlice(sdkPlugin.GetAttr(resp, "dataRow", []interface{}{}))
-	errorResponse := cast.ToString(sdkPlugin.GetAttr(resp, "errorResponse", ""))
-	request, ok := sdkPlugin.GetAttr(resp, "request", nil).([]byte)
-	if !ok {
-		request = []byte{}
-	}
-	response, ok := sdkPlugin.GetAttr(resp, "response", nil).([]byte)
-	if !ok {
-		response = []byte{}
-	}
-	server := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "server", ""))
+		OnTrafficFromServerCounter.Inc()
+		resp, err := postgres.HandleServerMessage(serverResponse, p.Logger)
+		if err != nil {
+			p.Logger.Info("Failed to handle server message", "error", err)
+		}
 
-	// This is used as a fallback if the database is not found in the startup message.
-	database := p.DefaultDBName
-	if database == "" {
-		client := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "client", ""))
-		if client != nil && client["remote"] != "" {
-			database, err = p.RedisClient.Get(ctx, client["remote"]).Result()
-			if err != nil {
-				CacheMissesCounter.Inc()
-				p.Logger.Debug("Failed to get cached response", "error", err)
+		rowDescription := cast.ToString(sdkPlugin.GetAttr(resp, "rowDescription", ""))
+		dataRow := cast.ToStringSlice(sdkPlugin.GetAttr(resp, "dataRow", []interface{}{}))
+		errorResponse := cast.ToString(sdkPlugin.GetAttr(resp, "errorResponse", ""))
+		request, isOk := sdkPlugin.GetAttr(resp, "request", nil).([]byte)
+		if !isOk {
+			request = []byte{}
+		}
+
+		response, isOk := sdkPlugin.GetAttr(resp, "response", nil).([]byte)
+		if !isOk {
+			response = []byte{}
+		}
+		server := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "server", ""))
+
+		// This is used as a fallback if the database is not found in the startup message.
+
+		database := p.DefaultDBName
+		if database == "" {
+			client := cast.ToStringMapString(sdkPlugin.GetAttr(resp, "client", ""))
+			if client != nil && client["remote"] != "" {
+				database, err = p.RedisClient.Get(ctx, client["remote"]).Result()
+				if err != nil {
+					CacheMissesCounter.Inc()
+					p.Logger.Debug("Failed to get cached response", "error", err)
+				}
+				CacheGetsCounter.Inc()
 			}
-			CacheGetsCounter.Inc()
-		}
-	}
-
-	// If the database is still not found, return the response as is without caching.
-	// This might also happen if the cache is cleared while the client is still connected.
-	// In this case, the client should reconnect and the error will go away.
-	if database == "" {
-		p.Logger.Debug("Database name not found or set in cache, startup message or plugin config. Skipping cache")
-		p.Logger.Debug("Consider setting the database name in the plugin config or disabling the plugin if you don't need it")
-		return resp, nil
-	}
-
-	cacheKey := strings.Join([]string{server["remote"], database, string(request)}, ":")
-	if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
-		// The request was successful and the response contains data. Cache the response.
-		if err := p.RedisClient.Set(ctx, cacheKey, response, p.Expiry).Err(); err != nil {
-			CacheMissesCounter.Inc()
-			p.Logger.Debug("Failed to set cache", "error", err)
-		}
-		CacheSetsCounter.Inc()
-
-		// Cache the query as well.
-		query, err := postgres.GetQueryFromRequest(request)
-		if err != nil {
-			p.Logger.Debug("Failed to get query from request", "error", err)
-			return resp, nil
 		}
 
-		tables, err := postgres.GetTablesFromQuery(query)
-		if err != nil {
-			p.Logger.Debug("Failed to get tables from query", "error", err)
-			return resp, nil
+		// If the database is still not found, return the response as is without caching.
+		// This might also happen if the cache is cleared while the client is still connected.
+		// In this case, the client should reconnect and the error will go away.
+		if database == "" {
+			p.Logger.Debug("Database name not found or set in cache, startup message or plugin config. " +
+				"Skipping cache")
+			p.Logger.Debug("Consider setting the database name in the " +
+				"plugin config or disabling the plugin if you don't need it")
+			return
 		}
 
-		// Cache the table(s) used in each cached request. This is used to invalidate
-		// the cache when a rows is inserted, updated or deleted into that table.
-		for _, table := range tables {
-			requestQueryCacheKey := strings.Join([]string{table, cacheKey}, ":")
-			if err := p.RedisClient.Set(
-				ctx, requestQueryCacheKey, "", p.Expiry).Err(); err != nil {
+		cacheKey := strings.Join([]string{server["remote"], database, string(request)}, ":")
+		if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
+			// The request was successful and the response contains data. Cache the response.
+			if err := p.RedisClient.Set(ctx, cacheKey, response, p.Expiry).Err(); err != nil {
 				CacheMissesCounter.Inc()
 				p.Logger.Debug("Failed to set cache", "error", err)
 			}
 			CacheSetsCounter.Inc()
+
+			// Cache the query as well.
+			query, err := postgres.GetQueryFromRequest(request)
+			if err != nil {
+				p.Logger.Debug("Failed to get query from request", "error", err)
+				return
+			}
+
+			tables, err := postgres.GetTablesFromQuery(query)
+			if err != nil {
+				p.Logger.Debug("Failed to get tables from query", "error", err)
+				return
+			}
+
+			// Cache the table(s) used in each cached request. This is used to invalidate
+			// the cache when a rows is inserted, updated or deleted into that table.
+			for _, table := range tables {
+				requestQueryCacheKey := strings.Join([]string{table, cacheKey}, ":")
+				if err := p.RedisClient.Set(
+					ctx, requestQueryCacheKey, "", p.Expiry).Err(); err != nil {
+					CacheMissesCounter.Inc()
+					p.Logger.Debug("Failed to set cache", "error", err)
+				}
+				CacheSetsCounter.Inc()
+			}
 		}
 	}
+}
 
+// OnTrafficFromServer is called when a response is received by GatewayD from the server.
+func (p *Plugin) OnTrafficFromServer(
+	_ context.Context, resp *v1.Struct,
+) (*v1.Struct, error) {
+	p.Logger.Debug("Traffic is coming from the server side")
+	p.UpdateCacheChannel <- resp
 	return resp, nil
 }
 
