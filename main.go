@@ -3,10 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
-	"os"
-	"strconv"
-
 	"github.com/gatewayd-io/gatewayd-plugin-cache/plugin"
 	sdkConfig "github.com/gatewayd-io/gatewayd-plugin-sdk/config"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
@@ -17,6 +13,8 @@ import (
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/spf13/cast"
+	"log"
+	"os"
 )
 
 func main() {
@@ -53,9 +51,8 @@ func main() {
 			go metrics.ExposeMetrics(metricsConfig, logger)
 		}
 
-		cacheBufferSizeStr := sdkConfig.GetEnv("CACHE_CHANNEL_BUFFER_SIZE", "100")
-		cacheBufferSize, err := strconv.Atoi(cacheBufferSizeStr)
-		if err != nil || cacheBufferSize <= 0 {
+		cacheBufferSize := cast.ToUint(cfg["cacheBufferSize"])
+		if cacheBufferSize <= 0 {
 			cacheBufferSize = 100 // default value
 		}
 
