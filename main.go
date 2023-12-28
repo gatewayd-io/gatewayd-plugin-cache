@@ -45,10 +45,9 @@ func main() {
 		Logger: logger,
 	})
 
-	var metricsConfig *metrics.MetricsConfig
 	//nolint:nestif
 	if cfg := cast.ToStringMap(plugin.PluginConfig["config"]); cfg != nil {
-		metricsConfig = metrics.NewMetricsConfig(cfg)
+		metricsConfig := metrics.NewMetricsConfig(cfg)
 		if metricsConfig != nil && metricsConfig.Enabled {
 			go metrics.ExposeMetrics(metricsConfig, logger)
 		}
