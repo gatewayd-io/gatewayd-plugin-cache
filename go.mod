@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/alicebob/miniredis/v2 v2.30.5
-	github.com/gatewayd-io/gatewayd-plugin-sdk v0.1.9
+	github.com/gatewayd-io/gatewayd-plugin-sdk v0.1.10
 	github.com/getsentry/sentry-go v0.25.0
 	github.com/go-co-op/gocron v1.37.0
 	github.com/go-redis/redis/v8 v8.11.5
@@ -33,7 +33,6 @@ require (
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/oklog/run v1.1.0 // indirect
-	github.com/pganalyze/pg_query_go/v4 v4.2.4-0.20231202022636-3c8cb1bd9d99 // indirect
 	github.com/pganalyze/pg_query_go/v5 v5.0.0-20231223014406-1896d12cec29 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
