@@ -1,6 +1,5 @@
 # Plugin configuration file for GatewayD
 
-verificationPolicy: "passdown"
 compatibilityPolicy: "strict"
 acceptancePolicy: "accept"
 terminationPolicy: "stop"
