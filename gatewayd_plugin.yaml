@@ -1,7 +1,6 @@
 # Plugin configuration file for GatewayD
 
 compatibilityPolicy: "strict"
-acceptancePolicy: "accept"
 terminationPolicy: "stop"
 enableMetricsMerger: True
 metricsMergerPeriod: 5s
