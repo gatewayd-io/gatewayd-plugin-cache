@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	sdkAct "github.com/gatewayd-io/gatewayd-plugin-sdk/act"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/databases/postgres"
 	sdkPlugin "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
@@ -119,30 +120,47 @@ func (p *Plugin) OnTrafficFromClient(
 	server := cast.ToStringMapString(sdkPlugin.GetAttr(req, "server", ""))
 	cacheKey := strings.Join([]string{server["remote"], database, request}, ":")
 
-	if query != "" {
-		p.Logger.Trace("Query", "query", query)
-
-		// Clear the cache if the query is an insert, update or delete query.
-		p.invalidateDML(ctx, query)
-
-		// Check if the query is cached.
-		response, err := p.RedisClient.Get(ctx, cacheKey).Bytes()
-		if err != nil {
-			CacheMissesCounter.Inc()
-			p.Logger.Debug("Failed to get cached response", "error", err)
-		}
-		CacheGetsCounter.Inc()
-
-		// If the query is cached, return the cached response.
-		if response != nil {
-			CacheHitsCounter.Inc()
-			// The response is cached.
-			req.Fields["response"] = v1.NewBytesValue(response)
-			req.Fields["terminate"] = v1.NewBoolValue(true)
-			return req, nil
-		}
+	if query == "" {
+		return req, nil
 	}
 
+	p.Logger.Trace("Query", "query", query)
+
+	// Clear the cache if the query is an insert, update or delete query.
+	p.invalidateDML(ctx, query)
+
+	// Check if the query is cached.
+	response, err := p.RedisClient.Get(ctx, cacheKey).Bytes()
+	if err != nil {
+		CacheMissesCounter.Inc()
+		p.Logger.Debug("Failed to get cached response", "error", err)
+	}
+	CacheGetsCounter.Inc()
+
+	if response == nil {
+		// If the query is not cached, return the request as is.
+		CacheMissesCounter.Inc()
+		return req, nil
+	}
+
+	// If the query is cached, return the cached response.
+	signals, err := v1.NewList([]any{
+		sdkAct.Terminate().ToMap(),
+		sdkAct.Log("debug", "Returning cached response", map[string]any{
+			"cacheKey": cacheKey,
+			"plugin":   PluginID.GetName(),
+		}).ToMap(),
+	})
+	if err != nil {
+		CacheMissesCounter.Inc()
+		// This should never happen, but log the error just in case.
+		p.Logger.Error("Failed to create signals", "error", err)
+	} else {
+		CacheHitsCounter.Inc()
+		// Return the cached response.
+		req.Fields[sdkAct.Signals] = v1.NewListValue(signals)
+		req.Fields["response"] = v1.NewBytesValue(response)
+	}
 	return req, nil
 }
 

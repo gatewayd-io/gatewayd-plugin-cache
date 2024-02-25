@@ -3,16 +3,18 @@ package plugin
 import (
 	"context"
 	"encoding/base64"
+	"os"
+	"sync"
+	"testing"
+
 	miniredis "github.com/alicebob/miniredis/v2"
+	sdkAct "github.com/gatewayd-io/gatewayd-plugin-sdk/act"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	pgproto3 "github.com/jackc/pgx/v5/pgproto3"
 	"github.com/stretchr/testify/assert"
-	"os"
-	"sync"
-	"testing"
 )
 
 func testQueryRequest() (string, []byte) {
@@ -174,5 +176,5 @@ func Test_Plugin(t *testing.T) {
 	assert.NotNil(t, result)
 	resultMap := result.AsMap()
 	assert.Equal(t, resultMap["response"], response)
-	assert.Equal(t, resultMap["terminate"], true)
+	assert.Contains(t, resultMap, sdkAct.Signals)
 }
