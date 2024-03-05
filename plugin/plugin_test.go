@@ -21,7 +21,8 @@ func testQueryRequest() (string, []byte) {
 	query := "SELECT * FROM users"
 	queryMsg := pgproto3.Query{String: query}
 	// Encode the data to base64.
-	return query, queryMsg.Encode(nil)
+	queryBytes, _ := queryMsg.Encode(nil)
+	return query, queryBytes
 }
 
 func testStartupRequest() []byte {
@@ -32,7 +33,8 @@ func testStartupRequest() []byte {
 			"database": "postgres",
 		},
 	}
-	return startupMsg.Encode(nil)
+	startupMsgBytes, _ := startupMsg.Encode(nil)
+	return startupMsgBytes
 }
 
 func Test_Plugin(t *testing.T) {
