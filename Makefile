@@ -44,4 +44,4 @@ build-platform: tidy
 	else \
 		tar czf dist/$(PLUGIN_NAME)-$(GOOS)-$(GOARCH)-${VERSION}.tar.gz -C $(OUTPUT_DIR)/ ${FILES}; \
 	fi
-	@sha256sum dist/$(PLUGIN_NAME)-$(GOOS)-$(GOARCH)-${VERSION}.* | sed '#dist/##g' >> dist/checksums.txt
+	@sha256sum dist/$(PLUGIN_NAME)-$(GOOS)-$(GOARCH)-${VERSION}.* | sed 's#dist/##g' >> dist/checksums.txt
