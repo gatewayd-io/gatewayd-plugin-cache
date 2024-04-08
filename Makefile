@@ -2,8 +2,8 @@ PLUGIN_NAME=gatewayd-plugin-cache
 PROJECT_URL=github.com/gatewayd-io/$(PLUGIN_NAME)
 CONFIG_PACKAGE=${PROJECT_URL}/plugin
 LAST_TAGGED_COMMIT=$(shell git rev-list --tags --max-count=1)
-VERSION=$(shell git describe --tags ${LAST_TAGGED_COMMIT}) | sed 's/^v//'
-EXTRA_LDFLAGS=-X ${CONFIG_PACKAGE}.Version=${VERSION}
+VERSION=$(shell git describe --tags ${LAST_TAGGED_COMMIT})
+EXTRA_LDFLAGS=-X ${CONFIG_PACKAGE}.Version=$(shell echo ${VERSION} | sed 's/^v//')
 FILES=$(PLUGIN_NAME) checksum.txt gatewayd_plugin.yaml README.md LICENSE
 
 tidy:
