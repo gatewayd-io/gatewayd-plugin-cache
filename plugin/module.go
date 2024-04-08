@@ -7,9 +7,10 @@ import (
 )
 
 var (
+	Version  = "0.0.1"
 	PluginID = v1.PluginID{
 		Name:      "gatewayd-plugin-cache",
-		Version:   "0.0.1",
+		Version:   Version,
 		RemoteUrl: "github.com/gatewayd-io/gatewayd-plugin-cache",
 	}
 	PluginMap = map[string]goplugin.Plugin{
