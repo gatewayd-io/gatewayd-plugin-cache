@@ -25,7 +25,7 @@ create-build-dir:
 	@mkdir -p dist
 
 build-release: tidy create-build-dir
-	@echo "Building gatewayd ${VERSION} for release"
+	@echo "Building ${PLUGIN_NAME} ${VERSION} for release"
 	@$(MAKE) build-platform GOOS=linux GOARCH=amd64 OUTPUT_DIR=dist/linux-amd64
 	@$(MAKE) build-platform GOOS=linux GOARCH=arm64 OUTPUT_DIR=dist/linux-arm64
 	@$(MAKE) build-platform GOOS=darwin GOARCH=amd64 OUTPUT_DIR=dist/darwin-amd64
@@ -34,7 +34,7 @@ build-release: tidy create-build-dir
 	@$(MAKE) build-platform GOOS=windows GOARCH=arm64 OUTPUT_DIR=dist/windows-arm64
 
 build-platform: tidy
-	@echo "Building gatewayd ${VERSION} for $(GOOS)-$(GOARCH)"
+	@echo "Building ${PLUGIN_NAME} ${VERSION} for $(GOOS)-$(GOARCH)"
 	@mkdir -p $(OUTPUT_DIR)
 	@cp README.md LICENSE gatewayd_plugin.yaml $(OUTPUT_DIR)/
 	@GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w ${EXTRA_LDFLAGS}" -o $(OUTPUT_DIR)/$(PLUGIN_NAME)
