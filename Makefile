@@ -6,7 +6,7 @@ VERSION=$(shell git describe --tags ${LAST_TAGGED_COMMIT})
 TIMESTAMP=$(shell date -u +"%FT%T%z")
 VERSION_DETAILS=${TIMESTAMP}/${LAST_TAGGED_COMMIT_SHORT}
 EXTRA_LDFLAGS=-X ${CONFIG_PACKAGE}.Version=${VERSION} -X ${CONFIG_PACKAGE}.VersionDetails=${VERSION_DETAILS}
-FILES=gatewayd-plugin-cache checksum.txt gatewayd_plugin.yaml README.md LICENSE
+FILES=$(PLUGIN_NAME) checksum.txt gatewayd_plugin.yaml README.md LICENSE
 
 tidy:
 	@go mod tidy
@@ -15,7 +15,7 @@ test:
 	@go test -v ./...
 
 checksum:
-	@sha256sum -b gatewayd-plugin-cache
+	@sha256sum -b $(PLUGIN_NAME)
 
 update-all:
 	@go get -u ./...
