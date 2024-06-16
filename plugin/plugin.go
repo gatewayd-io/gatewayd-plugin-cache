@@ -45,6 +45,22 @@ type CachePlugin struct {
 	Impl Plugin
 }
 
+// Define a set for PostgreSQL date/time functions
+// https://www.postgresql.org/docs/8.2/functions-datetime.html
+var pgDateTimeFunctions = map[string]struct{}{
+	"AGE":                   {},
+	"CLOCK_TIMESTAMP":       {},
+	"CURRENT_DATE":          {},
+	"CURRENT_TIME":          {},
+	"CURRENT_TIMESTAMP":     {},
+	"LOCALTIME":             {},
+	"LOCALTIMESTAMP":        {},
+	"NOW":                   {},
+	"STATEMENT_TIMESTAMP":   {},
+	"TIMEOFDAY":             {},
+	"TRANSACTION_TIMESTAMP": {},
+}
+
 // NewCachePlugin returns a new instance of the CachePlugin.
 func NewCachePlugin(impl Plugin) *CachePlugin {
 	return &CachePlugin{
@@ -164,6 +180,18 @@ func (p *Plugin) OnTrafficFromClient(
 	return req, nil
 }
 
+// IsCacheNeeded determines if caching is needed.
+func IsCacheNeeded(upperQuery string) bool {
+	// Iterate over each function name in the set of PostgreSQL date/time functions.
+	for function := range pgDateTimeFunctions {
+		if strings.Contains(upperQuery, function) {
+			// If the query contains a date/time function, caching is not needed.
+			return false
+		}
+	}
+	return true
+}
+
 func (p *Plugin) UpdateCache(ctx context.Context) {
 	for {
 		serverResponse, ok := <-p.UpdateCacheChannel
@@ -219,7 +247,7 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 		}
 
 		cacheKey := strings.Join([]string{server["remote"], database, string(request)}, ":")
-		if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
+		if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 && IsCacheNeeded(cacheKey) {
 			// The request was successful and the response contains data. Cache the response.
 			if err := p.RedisClient.Set(ctx, cacheKey, response, p.Expiry).Err(); err != nil {
 				CacheMissesCounter.Inc()

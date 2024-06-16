@@ -25,6 +25,22 @@ func testQueryRequest() (string, []byte) {
 	return query, queryBytes
 }
 
+func testQueryRequestWithDateFucntion() (string, []byte) {
+	query := `SELECT
+    	user_id,
+    	username,
+    	last_login,
+    	NOW() AS current_time
+		FROM
+    	users
+		WHERE
+    	last_login >= CURRENT_DATE;`
+	queryMsg := pgproto3.Query{String: query}
+	// Encode the data to base64.
+	queryBytes, _ := queryMsg.Encode(nil)
+	return query, queryBytes
+}
+
 func testStartupRequest() []byte {
 	startupMsg := pgproto3.StartupMessage{
 		ProtocolVersion: 196608,
@@ -179,4 +195,77 @@ func Test_Plugin(t *testing.T) {
 	resultMap := result.AsMap()
 	assert.Equal(t, resultMap["response"], response)
 	assert.Contains(t, resultMap, sdkAct.Signals)
+}
+
+func TestPluginDateFunctionInQuery(t *testing.T) {
+	// Initialize a new mock Redis server.
+	mockRedisServer := miniredis.RunT(t)
+	redisURL := "redis://" + mockRedisServer.Addr() + "/0"
+	redisConfig, err := redis.ParseURL(redisURL)
+	redisClient := redis.NewClient(redisConfig)
+
+	cacheUpdateChannel := make(chan *v1.Struct, 10)
+
+	// Create and initialize a new plugin.
+	logger := hclog.New(&hclog.LoggerOptions{
+		Level:  logging.GetLogLevel("error"),
+		Output: os.Stdout,
+	})
+	plugin := NewCachePlugin(Plugin{
+		Logger:             logger,
+		RedisURL:           redisURL,
+		RedisClient:        redisClient,
+		UpdateCacheChannel: cacheUpdateChannel,
+	})
+
+	// Use a WaitGroup to wait for the goroutine to finish.
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		plugin.Impl.UpdateCache(context.Background())
+	}()
+
+	// Test the plugin's OnTrafficFromClient method with a StartupMessage.
+	clientArgs := map[string]interface{}{
+		"request": testStartupRequest(),
+		"client": map[string]interface{}{
+			"local":  "localhost:15432",
+			"remote": "localhost:45320",
+		},
+		"server": map[string]interface{}{
+			"local":  "localhost:54321",
+			"remote": "localhost:5432",
+		},
+		"error": "",
+	}
+	clientRequest, err := v1.NewStruct(clientArgs)
+	plugin.Impl.OnTrafficFromClient(context.Background(), clientRequest)
+
+	// Test the plugin's OnTrafficFromServer method with a query request.
+	_, queryRequest := testQueryRequestWithDateFucntion()
+	queryResponse, err := base64.StdEncoding.DecodeString("VAAAABsAAWlkAAAAQAQAAQAAABcABP////8AAEQAAAALAAEAAAABMUMAAAANU0VMRUNUIDEAWgAAAAVJ")
+	assert.Nil(t, err)
+	queryArgs := map[string]interface{}{
+		"request":  queryRequest,
+		"response": queryResponse,
+		"client": map[string]interface{}{
+			"local":  "localhost:15432",
+			"remote": "localhost:45320",
+		},
+		"server": map[string]interface{}{
+			"local":  "localhost:54321",
+			"remote": "localhost:5432",
+		},
+		"error": "",
+	}
+	serverRequest, err := v1.NewStruct(queryArgs)
+	plugin.Impl.OnTrafficFromServer(context.Background(), serverRequest)
+
+	// Close the channel and wait for the cache updater to return gracefully.
+	close(cacheUpdateChannel)
+	wg.Wait()
+
+	keys, _ := redisClient.Keys(context.Background(), "*").Result()
+	assert.Equal(t, 1, len(keys)) // Only one key (representing the database name) should be present.
 }
