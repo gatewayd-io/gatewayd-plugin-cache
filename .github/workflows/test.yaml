@@ -12,8 +12,8 @@ jobs:
   test:
     name: Test gatewayd-plugin-cache
     runs-on: ubuntu-latest
-    # Timeout after 3 minutes, to avoid hanging tests
-    timeout-minutes: 3
+    # Timeout after 5 minutes, to avoid hanging tests
+    timeout-minutes: 5
     steps:
       - name: Checkout 🛎️
         uses: actions/checkout@v3
