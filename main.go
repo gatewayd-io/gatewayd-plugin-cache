@@ -12,11 +12,14 @@ import (
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/metrics"
 	p "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
+	apiV1 "github.com/gatewayd-io/gatewayd/api/v1"
 	"github.com/getsentry/sentry-go"
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/spf13/cast"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -51,6 +54,23 @@ func main() {
 		if metricsConfig != nil && metricsConfig.Enabled {
 			go metrics.ExposeMetrics(metricsConfig, logger)
 		}
+
+		// Initialize the API client to get proxies from GatewayD.
+		apiGRPCAddress := cast.ToString(cfg["apiGRPCAddress"])
+		apiClientConn, err := grpc.NewClient(
+			apiGRPCAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			logger.Error("Failed to initialize API client", "error", err)
+			if pluginInstance.Impl.ExitOnStartupError {
+				logger.Info("Exiting due to startup error")
+				os.Exit(1)
+			}
+		}
+		pluginInstance.Impl.APIClientConn = apiClientConn
+		defer pluginInstance.Impl.APIClientConn.Close()
+		pluginInstance.Impl.APIClient = apiV1.NewGatewayDAdminAPIServiceClient(
+			pluginInstance.Impl.APIClientConn,
+		)
 
 		cacheBufferSize := cast.ToUint(cfg["cacheBufferSize"])
 		if cacheBufferSize <= 0 {
@@ -93,7 +113,6 @@ func main() {
 			cfg["periodicInvalidatorStartDelay"])
 		pluginInstance.Impl.PeriodicInvalidatorInterval = cast.ToDuration(
 			cfg["periodicInvalidatorInterval"])
-		pluginInstance.Impl.APIAddress = cast.ToString(cfg["apiAddress"])
 
 		// Start the periodic invalidator.
 		if pluginInstance.Impl.PeriodicInvalidatorEnabled {

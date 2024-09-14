@@ -34,6 +34,7 @@ var (
 			"metricsUnixDomainSocket": sdkConfig.GetEnv(
 				"METRICS_UNIX_DOMAIN_SOCKET", "/tmp/gatewayd-plugin-cache.sock"),
 			"metricsEndpoint": sdkConfig.GetEnv("METRICS_ENDPOINT", "/metrics"),
+			"apiGRPCAddress":  sdkConfig.GetEnv("API_GRPC_ADDRESS", "localhost:19090"),
 			"redisURL":        sdkConfig.GetEnv("REDIS_URL", "redis://localhost:6379/0"),
 			"expiry":          sdkConfig.GetEnv("EXPIRY", "1h"),
 			"defaultDBName":   sdkConfig.GetEnv("DEFAULT_DB_NAME", ""),
@@ -44,7 +45,6 @@ var (
 				"PERIODIC_INVALIDATOR_START_DELAY", "1m"),
 			"periodicInvalidatorInterval": sdkConfig.GetEnv(
 				"PERIODIC_INVALIDATOR_INTERVAL", "1m"),
-			"apiAddress":         sdkConfig.GetEnv("API_ADDRESS", "localhost:8080"),
 			"exitOnStartupError": sdkConfig.GetEnv("EXIT_ON_STARTUP_ERROR", "false"),
 			"cacheBufferSize":    sdkConfig.GetEnv("CACHE_CHANNEL_BUFFER_SIZE", "100"),
 		},
