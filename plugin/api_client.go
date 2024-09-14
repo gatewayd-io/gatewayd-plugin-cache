@@ -1,8 +1,10 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
-	"net/http"
+
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type Proxy struct {
@@ -12,25 +14,32 @@ type Proxy struct {
 }
 
 // getProxies returns a list of proxies from GatewayD.
-func (p *Plugin) getProxies() map[string]Proxy {
-	if p.APIAddress == "" {
-		p.Logger.Error("Failed to get a list of proxies from GatewayD", "error", "APIAddress is not set")
+func (p *Plugin) getProxies() map[string]map[string]Proxy {
+	if p.APIClient == nil {
+		p.Logger.Error(
+			"Failed to get a list of proxies from GatewayD",
+			"error", "API client is not initialized",
+		)
 		return nil
 	}
 
-	//nolint: noctx
-	resp, err := http.Get("http://" + p.APIAddress + "/v1/GatewayDPluginService/GetProxies")
+	proxies, err := p.APIClient.GetProxies(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		p.Logger.Error("Failed to get a list of proxies from GatewayD", "error", err)
 		return nil
 	}
-	defer resp.Body.Close()
 
-	proxies := map[string]Proxy{}
-	if err = json.NewDecoder(resp.Body).Decode(&proxies); err != nil {
-		p.Logger.Error("Failed to decode response from GatewayD", "error", err)
+	data, err := proxies.MarshalJSON()
+	if err != nil {
+		p.Logger.Error("Failed to marshal response from GatewayD", "error", err)
 		return nil
 	}
 
-	return proxies
+	var pxy map[string]map[string]Proxy
+	if err = json.Unmarshal(data, &pxy); err != nil {
+		p.Logger.Error("Failed to unmarshal response from GatewayD", "error", err)
+		return nil
+	}
+
+	return pxy
 }

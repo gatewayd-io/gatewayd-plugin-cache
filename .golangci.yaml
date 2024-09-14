@@ -12,24 +12,14 @@ linters:
     - nlreturn
     - testpackage
     - paralleltest
-    - exhaustivestruct
     - exhaustruct
     - gocognit
     - gochecknoinits
     - gocyclo
-    - maligned
     - funlen
     - maintidx
     - musttag
-    - nosnakecase
     - wrapcheck
-    - golint
-    - scopelint
-    - interfacer
-    - varcheck
-    - deadcode
-    - ifshort
-    - structcheck
 linters-settings:
   depguard:
     rules:
@@ -39,6 +29,7 @@ linters-settings:
           - "!$test"
         allow:
           - $gostd
+          - "github.com/gatewayd-io/gatewayd/api/v1"
           - "github.com/gatewayd-io/gatewayd-plugin-sdk"
           - "github.com/gatewayd-io/gatewayd-plugin-cache"
           - "github.com/prometheus/client_golang"

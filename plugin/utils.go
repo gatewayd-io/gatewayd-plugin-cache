@@ -73,17 +73,19 @@ func validateHostPort(hostPort string) (bool, error) {
 
 // isBusy checks if a client address exists in cache by matching the address
 // with the busy clients.
-func isBusy(proxies map[string]Proxy, address string) bool {
+func isBusy(proxies map[string]map[string]Proxy, address string) bool {
 	if proxies == nil {
 		// NOTE: If the API is not running, we assume that the client is busy,
 		// so that we don't accidentally make the client and the plugin unstable.
 		return true
 	}
 
-	for _, name := range proxies {
-		for _, client := range name.Busy {
-			if client == address {
-				return true
+	for _, group := range proxies {
+		for _, block := range group {
+			for _, client := range block.Busy {
+				if client == address {
+					return true
+				}
 			}
 		}
 	}

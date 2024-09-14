@@ -10,6 +10,7 @@ import (
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/databases/postgres"
 	sdkPlugin "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
+	apiV1 "github.com/gatewayd-io/gatewayd/api/v1"
 	goRedis "github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
@@ -22,6 +23,8 @@ type Plugin struct {
 	v1.GatewayDPluginServiceServer
 
 	Logger hclog.Logger
+
+	APIClient apiV1.GatewayDAdminAPIServiceClient
 
 	// Cache configuration.
 	RedisClient        *goRedis.Client
@@ -37,7 +40,6 @@ type Plugin struct {
 	PeriodicInvalidatorEnabled    bool
 	PeriodicInvalidatorStartDelay time.Duration
 	PeriodicInvalidatorInterval   time.Duration
-	APIAddress                    string
 }
 
 type CachePlugin struct {
