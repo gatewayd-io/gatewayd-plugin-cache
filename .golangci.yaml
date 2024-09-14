@@ -39,6 +39,7 @@ linters-settings:
           - "!$test"
         allow:
           - $gostd
+          - "github.com/gatewayd-io/gatewayd/api/v1"
           - "github.com/gatewayd-io/gatewayd-plugin-sdk"
           - "github.com/gatewayd-io/gatewayd-plugin-cache"
           - "github.com/prometheus/client_golang"
