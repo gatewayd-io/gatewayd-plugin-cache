@@ -24,8 +24,7 @@ type Plugin struct {
 
 	Logger hclog.Logger
 
-	APIClientConn *grpc.ClientConn
-	APIClient     apiV1.GatewayDAdminAPIServiceClient
+	APIClient apiV1.GatewayDAdminAPIServiceClient
 
 	// Cache configuration.
 	RedisClient        *goRedis.Client

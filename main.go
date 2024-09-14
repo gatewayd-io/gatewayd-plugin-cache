@@ -59,18 +59,18 @@ func main() {
 		apiGRPCAddress := cast.ToString(cfg["apiGRPCAddress"])
 		apiClientConn, err := grpc.NewClient(
 			apiGRPCAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
+		if err != nil || apiClientConn == nil {
 			logger.Error("Failed to initialize API client", "error", err)
 			if pluginInstance.Impl.ExitOnStartupError {
 				logger.Info("Exiting due to startup error")
+				if apiClientConn != nil {
+					apiClientConn.Close()
+				}
 				os.Exit(1)
 			}
 		}
-		pluginInstance.Impl.APIClientConn = apiClientConn
-		defer pluginInstance.Impl.APIClientConn.Close()
-		pluginInstance.Impl.APIClient = apiV1.NewGatewayDAdminAPIServiceClient(
-			pluginInstance.Impl.APIClientConn,
-		)
+		defer apiClientConn.Close()
+		pluginInstance.Impl.APIClient = apiV1.NewGatewayDAdminAPIServiceClient(apiClientConn)
 
 		cacheBufferSize := cast.ToUint(cfg["cacheBufferSize"])
 		if cacheBufferSize <= 0 {
@@ -91,7 +91,10 @@ func main() {
 			logger.Error("Failed to parse Redis URL", "error", err)
 			if pluginInstance.Impl.ExitOnStartupError {
 				logger.Info("Exiting due to startup error")
-				os.Exit(1)
+				if apiClientConn != nil {
+					apiClientConn.Close()
+				}
+				os.Exit(1) //nolint:gocritic
 			}
 		}
 
@@ -103,6 +106,9 @@ func main() {
 			logger.Error("Failed to ping Redis server", "error", err)
 			if pluginInstance.Impl.ExitOnStartupError {
 				logger.Info("Exiting due to startup error")
+				if apiClientConn != nil {
+					apiClientConn.Close()
+				}
 				os.Exit(1)
 			}
 		}
