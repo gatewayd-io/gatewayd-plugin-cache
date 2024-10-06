@@ -165,7 +165,7 @@ func (p *Plugin) OnTrafficFromClient(
 	signals, err := v1.NewList([]any{
 		sdkAct.Terminate().ToMap(),
 		sdkAct.Log("debug", "Returning cached response", map[string]any{
-			"cacheKey": cacheKey,
+			"cacheKey": []byte(cacheKey),
 			"plugin":   PluginID.GetName(),
 		}).ToMap(),
 	})
