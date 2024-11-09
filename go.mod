@@ -1,6 +1,6 @@
 module github.com/gatewayd-io/gatewayd-plugin-cache
 
-go 1.23.1
+go 1.23.3
 
 require (
 	github.com/alicebob/miniredis/v2 v2.30.5
