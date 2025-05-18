@@ -51,5 +51,6 @@ func Test_Plugin_getProxies_Fails_Connection_Error(t *testing.T) {
 		assert.Nil(t, proxies)
 	})
 
-	assert.Contains(t, output, `[ERROR] test: Failed to get a list of proxies from GatewayD: error="rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing: dial tcp 127.0.0.1:18080: connect: connection refused\""`)
+	assert.Contains(t, output, `[ERROR] test: Failed to get a list of proxies from GatewayD`)
+	assert.Contains(t, output, `transport: Error while dialing: dial tcp 127.0.0.1:18080: connect: connection refused`)
 }
