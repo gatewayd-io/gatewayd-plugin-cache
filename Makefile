@@ -18,6 +18,11 @@ checksum:
 update-all:
 	@go get -u ./...
 
+# https://groups.google.com/g/golang-nuts/c/FrWNhWsLDVY/m/CVd_iRedBwAJ
+update-direct-deps:
+	@go list -f '{{if not (or .Main .Indirect)}}{{.Path}}{{end}}' -m all | xargs -n1 go get
+	@go mod tidy
+
 build-dev: tidy
 	@CGO_ENABLED=0 go build
 
