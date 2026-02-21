@@ -63,4 +63,9 @@ var (
 		Name:      "cache_scan_keys_total",
 		Help:      "The total number of cache scan keys",
 	})
+	CacheErrorsCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: metrics.Namespace,
+		Name:      "cache_errors_total",
+		Help:      "The total number of Redis operation errors",
+	})
 )

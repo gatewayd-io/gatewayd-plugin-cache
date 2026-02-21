@@ -111,7 +111,7 @@ func (p *Plugin) OnTrafficFromClient(
 		if database == "" {
 			database, err = p.RedisClient.Get(ctx, client["remote"]).Result()
 			if err != nil {
-				CacheMissesCounter.Inc()
+				CacheErrorsCounter.Inc()
 				p.Logger.Debug("Failed to get cache", "error", err)
 			}
 			CacheGetsCounter.Inc()
@@ -150,7 +150,6 @@ func (p *Plugin) OnTrafficFromClient(
 	// Check if the query is cached.
 	response, err := p.RedisClient.Get(ctx, cacheKey).Bytes()
 	if err != nil {
-		CacheMissesCounter.Inc()
 		p.Logger.Debug("Failed to get cached response", "error", err)
 	}
 	CacheGetsCounter.Inc()
@@ -170,8 +169,7 @@ func (p *Plugin) OnTrafficFromClient(
 		}).ToMap(),
 	})
 	if err != nil {
-		CacheMissesCounter.Inc()
-		// This should never happen, but log the error just in case.
+		CacheErrorsCounter.Inc()
 		p.Logger.Error("Failed to create signals", "error", err)
 	} else {
 		CacheHitsCounter.Inc()
@@ -230,7 +228,7 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 			if client != nil && client["remote"] != "" {
 				database, err = p.RedisClient.Get(ctx, client["remote"]).Result()
 				if err != nil {
-					CacheMissesCounter.Inc()
+					CacheErrorsCounter.Inc()
 					p.Logger.Debug("Failed to get cached response", "error", err)
 				}
 				CacheGetsCounter.Inc()
@@ -262,7 +260,7 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 
 			// The request was successful and the response contains data. Cache the response.
 			if err := p.RedisClient.Set(ctx, cacheKey, response, p.Expiry).Err(); err != nil {
-				CacheMissesCounter.Inc()
+				CacheErrorsCounter.Inc()
 				p.Logger.Debug("Failed to set cache", "error", err)
 			}
 			CacheSetsCounter.Inc()
@@ -279,7 +277,7 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 				requestQueryCacheKey := strings.Join([]string{table, cacheKey}, ":")
 				if err := p.RedisClient.Set(
 					ctx, requestQueryCacheKey, "", p.Expiry).Err(); err != nil {
-					CacheMissesCounter.Inc()
+					CacheErrorsCounter.Inc()
 					p.Logger.Debug("Failed to set cache", "error", err)
 				}
 				CacheSetsCounter.Inc()
@@ -303,7 +301,7 @@ func (p *Plugin) OnClosed(ctx context.Context, req *v1.Struct) (*v1.Struct, erro
 	if client != nil {
 		if err := p.RedisClient.Del(ctx, client["remote"]).Err(); err != nil {
 			p.Logger.Debug("Failed to delete cache", "error", err)
-			CacheMissesCounter.Inc()
+			CacheErrorsCounter.Inc()
 		}
 		p.Logger.Debug("Client closed", "client", client["remote"])
 		CacheDeletesCounter.Inc()
@@ -349,7 +347,7 @@ func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 		for {
 			scanResult := p.RedisClient.Scan(ctx, cursor, table+":*", p.ScanCount)
 			if scanResult.Err() != nil {
-				CacheMissesCounter.Inc()
+				CacheErrorsCounter.Inc()
 				p.Logger.Debug("Failed to scan keys", "error", scanResult.Err())
 				break
 			}
@@ -361,8 +359,8 @@ func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 			CacheScanKeysCounter.Add(float64(len(keys)))
 			for _, tableKey := range keys {
 				// Invalidate the cache for the table.
-				cachedRespnseKey := strings.TrimPrefix(tableKey, table+":")
-				pipeline.Del(ctx, cachedRespnseKey)
+				cachedResponseKey := strings.TrimPrefix(tableKey, table+":")
+				pipeline.Del(ctx, cachedResponseKey)
 				// Invalidate the table cache key itself.
 				pipeline.Del(ctx, tableKey)
 			}
@@ -379,7 +377,7 @@ func (p *Plugin) invalidateDML(ctx context.Context, query string) {
 
 		for _, res := range result {
 			if res.Err() != nil {
-				CacheMissesCounter.Inc()
+				CacheErrorsCounter.Inc()
 			} else {
 				CacheDeletesCounter.Inc()
 			}
@@ -419,7 +417,7 @@ func (p *Plugin) getDBFromStartupMessage(
 				startupMsgParams["database"],
 				time.Duration(0),
 			).Err(); err != nil {
-				CacheMissesCounter.Inc()
+				CacheErrorsCounter.Inc()
 				p.Logger.Debug("Failed to set cache", "error", err)
 			}
 			CacheSetsCounter.Inc()

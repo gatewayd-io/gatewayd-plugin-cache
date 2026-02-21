@@ -25,7 +25,7 @@ func testQueryRequest() (string, []byte) {
 	return query, queryBytes
 }
 
-func testQueryRequestWithDateFucntion() (string, []byte) {
+func testQueryRequestWithDateFunction() (string, []byte) {
 	query := `SELECT
     	user_id,
     	username,
@@ -243,7 +243,7 @@ func TestPluginDateFunctionInQuery(t *testing.T) {
 	plugin.Impl.OnTrafficFromClient(context.Background(), clientRequest)
 
 	// Test the plugin's OnTrafficFromServer method with a query request.
-	_, queryRequest := testQueryRequestWithDateFucntion()
+	_, queryRequest := testQueryRequestWithDateFunction()
 	queryResponse, err := base64.StdEncoding.DecodeString("VAAAABsAAWlkAAAAQAQAAQAAABcABP////8AAEQAAAALAAEAAAABMUMAAAANU0VMRUNUIDEAWgAAAAVJ")
 	assert.Nil(t, err)
 	queryArgs := map[string]interface{}{
