@@ -249,20 +249,23 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 		}
 
 		cacheKey := strings.Join([]string{server["remote"], database, string(request)}, ":")
-		if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 && IsCacheNeeded(cacheKey) {
+		if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
+			query, err := postgres.GetQueryFromRequest(request)
+			if err != nil {
+				p.Logger.Debug("Failed to get query from request", "error", err)
+				continue
+			}
+
+			if !IsCacheNeeded(strings.ToUpper(query)) {
+				continue
+			}
+
 			// The request was successful and the response contains data. Cache the response.
 			if err := p.RedisClient.Set(ctx, cacheKey, response, p.Expiry).Err(); err != nil {
 				CacheMissesCounter.Inc()
 				p.Logger.Debug("Failed to set cache", "error", err)
 			}
 			CacheSetsCounter.Inc()
-
-			// Cache the query as well.
-			query, err := postgres.GetQueryFromRequest(request)
-			if err != nil {
-				p.Logger.Debug("Failed to get query from request", "error", err)
-				continue
-			}
 
 			tables, err := postgres.GetTablesFromQuery(query)
 			if err != nil {
