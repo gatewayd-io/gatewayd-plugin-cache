@@ -50,6 +50,12 @@ func main() {
 
 	//nolint:nestif
 	if cfg := cast.ToStringMap(plugin.PluginConfig["config"]); cfg != nil {
+		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
+		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
+		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
+		pluginInstance.Impl.ScanCount = cast.ToInt64(cfg["scanCount"])
+		pluginInstance.Impl.ExitOnStartupError = cast.ToBool(cfg["exitOnStartupError"])
+
 		metricsConfig := metrics.NewMetricsConfig(cfg)
 		if metricsConfig != nil && metricsConfig.Enabled {
 			go metrics.ExposeMetrics(metricsConfig, logger)
@@ -79,12 +85,6 @@ func main() {
 
 		pluginInstance.Impl.UpdateCacheChannel = make(chan *v1.Struct, cacheBufferSize)
 		go pluginInstance.Impl.UpdateCache(context.Background())
-
-		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
-		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
-		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
-		pluginInstance.Impl.ScanCount = cast.ToInt64(cfg["scanCount"])
-		pluginInstance.Impl.ExitOnStartupError = cast.ToBool(cfg["exitOnStartupError"])
 
 		redisConfig, err := redis.ParseURL(pluginInstance.Impl.RedisURL)
 		if err != nil {
@@ -126,7 +126,9 @@ func main() {
 		}
 	}
 
-	defer close(pluginInstance.Impl.UpdateCacheChannel)
+	if pluginInstance.Impl.UpdateCacheChannel != nil {
+		defer close(pluginInstance.Impl.UpdateCacheChannel)
+	}
 
 	goplugin.Serve(&goplugin.ServeConfig{
 		HandshakeConfig: goplugin.HandshakeConfig{
