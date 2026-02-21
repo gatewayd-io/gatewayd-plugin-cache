@@ -245,7 +245,7 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 				"Skipping cache")
 			p.Logger.Debug("Consider setting the database name in the " +
 				"plugin config or disabling the plugin if you don't need it")
-			return
+			continue
 		}
 
 		cacheKey := strings.Join([]string{server["remote"], database, string(request)}, ":")
@@ -261,13 +261,13 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 			query, err := postgres.GetQueryFromRequest(request)
 			if err != nil {
 				p.Logger.Debug("Failed to get query from request", "error", err)
-				return
+				continue
 			}
 
 			tables, err := postgres.GetTablesFromQuery(query)
 			if err != nil {
 				p.Logger.Debug("Failed to get tables from query", "error", err)
-				return
+				continue
 			}
 
 			// Cache the table(s) used in each cached request. This is used to invalidate
