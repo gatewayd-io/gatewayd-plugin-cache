@@ -66,11 +66,27 @@ func main() {
 
 	//nolint:nestif
 	if cfg := cast.ToStringMap(plugin.PluginConfig["config"]); cfg != nil {
-		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
-		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
-		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
-		pluginInstance.Impl.ScanCount = cast.ToInt64(cfg["scanCount"])
 		pluginInstance.Impl.ExitOnStartupError = cast.ToBool(cfg["exitOnStartupError"])
+
+		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
+		if pluginInstance.Impl.RedisURL == "" {
+			logger.Warn("redisURL is empty, defaulting to redis://localhost:6379")
+			pluginInstance.Impl.RedisURL = "redis://localhost:6379"
+		}
+
+		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
+		if pluginInstance.Impl.Expiry <= 0 {
+			logger.Warn("expiry is invalid or unset, defaulting to 1h")
+			pluginInstance.Impl.Expiry = cast.ToDuration("1h")
+		}
+
+		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
+
+		pluginInstance.Impl.ScanCount = cast.ToInt64(cfg["scanCount"])
+		if pluginInstance.Impl.ScanCount <= 0 {
+			logger.Warn("scanCount is invalid or unset, defaulting to 1000")
+			pluginInstance.Impl.ScanCount = 1000
+		}
 
 		metricsConfig := metrics.NewMetricsConfig(cfg)
 		if metricsConfig != nil && metricsConfig.Enabled {
