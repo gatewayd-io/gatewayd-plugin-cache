@@ -76,15 +76,11 @@ func Test_Plugin(t *testing.T) {
 		RedisURL:           redisURL,
 		RedisClient:        redisClient,
 		UpdateCacheChannel: updateCacheChannel,
+		WaitGroup:          &sync.WaitGroup{},
 	})
 
-	// Use a WaitGroup to wait for the goroutine to finish
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		p.Impl.UpdateCache(context.Background())
-	}()
+	p.Impl.WaitGroup.Add(1)
+	go p.Impl.UpdateCache(context.Background())
 
 	assert.NotNil(t, p)
 
@@ -178,9 +174,8 @@ func Test_Plugin(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.Equal(t, result, resp)
 
-	// Close the channel and wait for the cache updater to return gracefully
 	close(updateCacheChannel)
-	wg.Wait()
+	p.Impl.WaitGroup.Wait()
 
 	// Check that the query and response was cached.
 	cachedResponse, err := redisClient.Get(
@@ -216,15 +211,11 @@ func TestPluginDateFunctionInQuery(t *testing.T) {
 		RedisURL:           redisURL,
 		RedisClient:        redisClient,
 		UpdateCacheChannel: cacheUpdateChannel,
+		WaitGroup:          &sync.WaitGroup{},
 	})
 
-	// Use a WaitGroup to wait for the goroutine to finish.
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		plugin.Impl.UpdateCache(context.Background())
-	}()
+	plugin.Impl.WaitGroup.Add(1)
+	go plugin.Impl.UpdateCache(context.Background())
 
 	// Test the plugin's OnTrafficFromClient method with a StartupMessage.
 	clientArgs := map[string]interface{}{
@@ -262,9 +253,8 @@ func TestPluginDateFunctionInQuery(t *testing.T) {
 	serverRequest, err := v1.NewStruct(queryArgs)
 	plugin.Impl.OnTrafficFromServer(context.Background(), serverRequest)
 
-	// Close the channel and wait for the cache updater to return gracefully.
 	close(cacheUpdateChannel)
-	wg.Wait()
+	plugin.Impl.WaitGroup.Wait()
 
 	keys, _ := redisClient.Keys(context.Background(), "*").Result()
 	assert.Equal(t, 1, len(keys)) // Only one key (representing the database name) should be present.

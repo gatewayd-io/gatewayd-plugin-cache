@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/gatewayd-io/gatewayd-plugin-cache/plugin"
 	sdkConfig "github.com/gatewayd-io/gatewayd-plugin-sdk/config"
@@ -61,7 +62,8 @@ func main() {
 	})
 
 	pluginInstance := plugin.NewCachePlugin(plugin.Plugin{
-		Logger: logger,
+		Logger:    logger,
+		WaitGroup: &sync.WaitGroup{},
 	})
 
 	//nolint:nestif
@@ -110,6 +112,7 @@ func main() {
 		}
 
 		pluginInstance.Impl.UpdateCacheChannel = make(chan *v1.Struct, cacheBufferSize)
+		pluginInstance.Impl.WaitGroup.Add(1)
 		go pluginInstance.Impl.UpdateCache(context.Background())
 
 		redisConfig, err := redis.ParseURL(pluginInstance.Impl.RedisURL)
@@ -140,9 +143,12 @@ func main() {
 		}
 	}
 
-	if pluginInstance.Impl.UpdateCacheChannel != nil {
-		defer close(pluginInstance.Impl.UpdateCacheChannel)
-	}
+	defer func() {
+		if pluginInstance.Impl.UpdateCacheChannel != nil {
+			close(pluginInstance.Impl.UpdateCacheChannel)
+			pluginInstance.Impl.WaitGroup.Wait()
+		}
+	}()
 
 	goplugin.Serve(&goplugin.ServeConfig{
 		HandshakeConfig: goplugin.HandshakeConfig{

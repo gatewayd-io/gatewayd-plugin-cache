@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"strings"
+	"sync"
 	"time"
 
 	sdkAct "github.com/gatewayd-io/gatewayd-plugin-sdk/act"
@@ -35,6 +36,7 @@ type Plugin struct {
 	ExitOnStartupError bool
 
 	UpdateCacheChannel chan *v1.Struct
+	WaitGroup          *sync.WaitGroup
 
 	// Periodic invalidator configuration.
 	PeriodicInvalidatorEnabled    bool
@@ -193,6 +195,7 @@ func IsCacheNeeded(upperQuery string) bool {
 }
 
 func (p *Plugin) UpdateCache(ctx context.Context) {
+	defer p.WaitGroup.Done()
 	for {
 		serverResponse, ok := <-p.UpdateCacheChannel
 		if !ok {
