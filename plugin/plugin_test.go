@@ -3,17 +3,19 @@ package plugin
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	miniredis "github.com/alicebob/miniredis/v2"
 	sdkAct "github.com/gatewayd-io/gatewayd-plugin-sdk/act"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
-	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	pgproto3 "github.com/jackc/pgx/v5/pgproto3"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +27,7 @@ func testQueryRequest() (string, []byte) {
 	return query, queryBytes
 }
 
-func testQueryRequestWithDateFucntion() (string, []byte) {
+func testQueryRequestWithDateFunction() (string, []byte) {
 	query := `SELECT
     	user_id,
     	username,
@@ -76,15 +78,11 @@ func Test_Plugin(t *testing.T) {
 		RedisURL:           redisURL,
 		RedisClient:        redisClient,
 		UpdateCacheChannel: updateCacheChannel,
+		WaitGroup:          &sync.WaitGroup{},
 	})
 
-	// Use a WaitGroup to wait for the goroutine to finish
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		p.Impl.UpdateCache(context.Background())
-	}()
+	p.Impl.WaitGroup.Add(1)
+	go p.Impl.UpdateCache(context.Background())
 
 	assert.NotNil(t, p)
 
@@ -178,9 +176,8 @@ func Test_Plugin(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.Equal(t, result, resp)
 
-	// Close the channel and wait for the cache updater to return gracefully
 	close(updateCacheChannel)
-	wg.Wait()
+	p.Impl.WaitGroup.Wait()
 
 	// Check that the query and response was cached.
 	cachedResponse, err := redisClient.Get(
@@ -216,15 +213,11 @@ func TestPluginDateFunctionInQuery(t *testing.T) {
 		RedisURL:           redisURL,
 		RedisClient:        redisClient,
 		UpdateCacheChannel: cacheUpdateChannel,
+		WaitGroup:          &sync.WaitGroup{},
 	})
 
-	// Use a WaitGroup to wait for the goroutine to finish.
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		plugin.Impl.UpdateCache(context.Background())
-	}()
+	plugin.Impl.WaitGroup.Add(1)
+	go plugin.Impl.UpdateCache(context.Background())
 
 	// Test the plugin's OnTrafficFromClient method with a StartupMessage.
 	clientArgs := map[string]interface{}{
@@ -243,7 +236,7 @@ func TestPluginDateFunctionInQuery(t *testing.T) {
 	plugin.Impl.OnTrafficFromClient(context.Background(), clientRequest)
 
 	// Test the plugin's OnTrafficFromServer method with a query request.
-	_, queryRequest := testQueryRequestWithDateFucntion()
+	_, queryRequest := testQueryRequestWithDateFunction()
 	queryResponse, err := base64.StdEncoding.DecodeString("VAAAABsAAWlkAAAAQAQAAQAAABcABP////8AAEQAAAALAAEAAAABMUMAAAANU0VMRUNUIDEAWgAAAAVJ")
 	assert.Nil(t, err)
 	queryArgs := map[string]interface{}{
@@ -262,10 +255,200 @@ func TestPluginDateFunctionInQuery(t *testing.T) {
 	serverRequest, err := v1.NewStruct(queryArgs)
 	plugin.Impl.OnTrafficFromServer(context.Background(), serverRequest)
 
-	// Close the channel and wait for the cache updater to return gracefully.
 	close(cacheUpdateChannel)
-	wg.Wait()
+	plugin.Impl.WaitGroup.Wait()
 
 	keys, _ := redisClient.Keys(context.Background(), "*").Result()
 	assert.Equal(t, 1, len(keys)) // Only one key (representing the database name) should be present.
+}
+
+func newTestPlugin(t *testing.T) (*CachePlugin, *redis.Client) {
+	t.Helper()
+	redisServer := miniredis.RunT(t)
+	redisURL := "redis://" + redisServer.Addr() + "/0"
+	redisConfig, _ := redis.ParseURL(redisURL)
+	redisClient := redis.NewClient(redisConfig)
+
+	logger := hclog.New(&hclog.LoggerOptions{
+		Level:  logging.GetLogLevel("error"),
+		Output: os.Stdout,
+	})
+	p := NewCachePlugin(Plugin{
+		Logger:             logger,
+		RedisURL:           redisURL,
+		RedisClient:        redisClient,
+		Expiry:             time.Hour,
+		ScanCount:          1000,
+		UpdateCacheChannel: make(chan *v1.Struct, 10),
+		WaitGroup:          &sync.WaitGroup{},
+	})
+	return p, redisClient
+}
+
+func TestIsCacheNeeded(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  bool
+	}{
+		{"plain SELECT", "SELECT * FROM USERS", true},
+		{"contains NOW()", "SELECT NOW(), ID FROM USERS", false},
+		{"contains CURRENT_DATE", "SELECT ID FROM USERS WHERE CREATED_AT >= CURRENT_DATE", false},
+		{"contains CURRENT_TIMESTAMP", "SELECT CURRENT_TIMESTAMP", false},
+		{"contains CLOCK_TIMESTAMP()", "SELECT CLOCK_TIMESTAMP()", false},
+		{"contains LOCALTIME", "SELECT LOCALTIME", false},
+		{"contains LOCALTIMESTAMP", "SELECT LOCALTIMESTAMP", false},
+		{"contains AGE()", "SELECT AGE(TIMESTAMP '2001-04-10')", false},
+		{"contains STATEMENT_TIMESTAMP", "SELECT STATEMENT_TIMESTAMP()", false},
+		{"contains TIMEOFDAY", "SELECT TIMEOFDAY()", false},
+		{"contains TRANSACTION_TIMESTAMP", "SELECT TRANSACTION_TIMESTAMP()", false},
+		{"INSERT query", "INSERT INTO USERS VALUES (1)", true},
+		{"empty query", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsCacheNeeded(tt.query))
+		})
+	}
+}
+
+func TestOnClosed(t *testing.T) {
+	p, redisClient := newTestPlugin(t)
+	ctx := context.Background()
+
+	// Simulate a stored client-to-database mapping.
+	redisClient.Set(ctx, "localhost:45320", "postgres", 0)
+	val := redisClient.Get(ctx, "localhost:45320").Val()
+	assert.Equal(t, "postgres", val)
+
+	// Call OnClosed to clean up.
+	args := map[string]interface{}{
+		"client": map[string]interface{}{
+			"local":  "localhost:15432",
+			"remote": "localhost:45320",
+		},
+	}
+	req, err := v1.NewStruct(args)
+	assert.Nil(t, err)
+
+	result, err := p.Impl.OnClosed(ctx, req)
+	assert.Nil(t, err)
+	assert.NotNil(t, result)
+
+	// The client key should be deleted.
+	val = redisClient.Get(ctx, "localhost:45320").Val()
+	assert.Equal(t, "", val)
+}
+
+func TestOnClosedNilClient(t *testing.T) {
+	p, _ := newTestPlugin(t)
+	ctx := context.Background()
+
+	args := map[string]interface{}{}
+	req, err := v1.NewStruct(args)
+	assert.Nil(t, err)
+
+	result, err := p.Impl.OnClosed(ctx, req)
+	assert.Nil(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestInvalidateDML(t *testing.T) {
+	p, redisClient := newTestPlugin(t)
+	ctx := context.Background()
+
+	_, request := testQueryRequest()
+	cacheKey := "localhost:5432:postgres:" + string(request)
+	tableKey := "users:" + cacheKey
+
+	// Pre-populate cache entries (simulating cached SELECT response + table index).
+	redisClient.Set(ctx, cacheKey, "cached-response-data", time.Hour)
+	redisClient.Set(ctx, tableKey, "", time.Hour)
+
+	val := redisClient.Get(ctx, cacheKey).Val()
+	assert.Equal(t, "cached-response-data", val)
+
+	// Build a base64-encoded query message for an INSERT query.
+	insertQuery := map[string]string{"String": "INSERT INTO users VALUES (1)"}
+	queryJSON, err := json.Marshal(insertQuery)
+	assert.Nil(t, err)
+	encodedQuery := base64.StdEncoding.EncodeToString(queryJSON)
+
+	p.Impl.invalidateDML(ctx, encodedQuery)
+
+	// Both the cached response and the table index key should be deleted.
+	val = redisClient.Get(ctx, cacheKey).Val()
+	assert.Equal(t, "", val)
+	val = redisClient.Get(ctx, tableKey).Val()
+	assert.Equal(t, "", val)
+}
+
+func TestInvalidateDMLSelectIgnored(t *testing.T) {
+	p, redisClient := newTestPlugin(t)
+	ctx := context.Background()
+
+	// Pre-populate a cache entry.
+	redisClient.Set(ctx, "test-key", "test-value", time.Hour)
+
+	selectQuery := map[string]string{"String": "SELECT * FROM users"}
+	queryJSON, _ := json.Marshal(selectQuery)
+	encodedQuery := base64.StdEncoding.EncodeToString(queryJSON)
+
+	p.Impl.invalidateDML(ctx, encodedQuery)
+
+	// SELECT queries should not trigger invalidation.
+	val := redisClient.Get(ctx, "test-key").Val()
+	assert.Equal(t, "test-value", val)
+}
+
+func TestUpdateCacheContinuesOnError(t *testing.T) {
+	p, redisClient := newTestPlugin(t)
+	ctx := context.Background()
+
+	p.Impl.WaitGroup.Add(1)
+	go p.Impl.UpdateCache(ctx)
+
+	// Send a message with empty database (should trigger continue, not kill goroutine).
+	badArgs := map[string]interface{}{
+		"request":  []byte{},
+		"response": []byte{},
+		"client": map[string]interface{}{
+			"remote": "unknown:99999",
+		},
+		"server": map[string]interface{}{
+			"remote": "localhost:5432",
+		},
+	}
+	badResp, _ := v1.NewStruct(badArgs)
+	p.Impl.UpdateCacheChannel <- badResp
+
+	// Now send a valid message. If the goroutine survived, this will be processed.
+	_, request := testQueryRequest()
+	response, _ := base64.StdEncoding.DecodeString(
+		"VAAAABsAAWlkAAAAQAQAAQAAABcABP////8AAEQAAAALAAEAAAABMUMAAAANU0VMRUNUIDEAWgAAAAVJ")
+
+	// Set up the database mapping so UpdateCache can find it.
+	redisClient.Set(ctx, "localhost:45320", "postgres", 0)
+
+	goodArgs := map[string]interface{}{
+		"request":  request,
+		"response": response,
+		"client": map[string]interface{}{
+			"remote": "localhost:45320",
+		},
+		"server": map[string]interface{}{
+			"remote": "localhost:5432",
+		},
+	}
+	goodResp, _ := v1.NewStruct(goodArgs)
+	p.Impl.UpdateCacheChannel <- goodResp
+
+	close(p.Impl.UpdateCacheChannel)
+	p.Impl.WaitGroup.Wait()
+
+	// The valid message should have been cached (goroutine survived the error).
+	cachedResponse, err := redisClient.Get(
+		ctx, "localhost:5432:postgres:"+string(request)).Bytes()
+	assert.Nil(t, err)
+	assert.Equal(t, response, cachedResponse)
 }

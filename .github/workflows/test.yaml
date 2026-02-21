@@ -12,21 +12,25 @@ jobs:
   test:
     name: Test gatewayd-plugin-cache
     runs-on: ubuntu-latest
-    # Timeout after 5 minutes, to avoid hanging tests
     timeout-minutes: 5
     steps:
       - name: Checkout 🛎️
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Go 🧑‍💻
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: "1.24"
 
       - name: Lint code issues 🚨
         uses: golangci/golangci-lint-action@v6
+
+      - name: Run govulncheck 🔒
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: "1.24"
 
       - name: Run Go tests 🔬
         run: go test -cover -covermode atomic -coverprofile=profile.cov -v ./...

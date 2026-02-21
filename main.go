@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"flag"
+	"io"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/gatewayd-io/gatewayd-plugin-cache/plugin"
 	sdkConfig "github.com/gatewayd-io/gatewayd-plugin-sdk/config"
@@ -14,17 +16,33 @@ import (
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	apiV1 "github.com/gatewayd-io/gatewayd/api/v1"
 	"github.com/getsentry/sentry-go"
-	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
+	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// handleStartupError logs an error and exits if ExitOnStartupError is set,
+// closing any provided resources before exit.
+func handleStartupError(
+	logger hclog.Logger, exitOnError bool, msg string, err error, closers ...io.Closer,
+) {
+	logger.Error(msg, "error", err)
+	if exitOnError {
+		logger.Info("Exiting due to startup error")
+		for _, c := range closers {
+			if c != nil {
+				c.Close()
+			}
+		}
+		os.Exit(1)
+	}
+}
+
 func main() {
 	sentryDSN := sdkConfig.GetEnv("SENTRY_DSN", "")
-	// Initialize Sentry SDK
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              sentryDSN,
 		TracesSampleRate: 1.0,
@@ -33,7 +51,6 @@ func main() {
 		log.Fatalf("Failed to initialize Sentry SDK: %s", err.Error())
 	}
 
-	// Parse command line flags, passed by GatewayD via the plugin config
 	logLevel := flag.String("log-level", "info", "Log level")
 	flag.Parse()
 
@@ -45,72 +62,73 @@ func main() {
 	})
 
 	pluginInstance := plugin.NewCachePlugin(plugin.Plugin{
-		Logger: logger,
+		Logger:    logger,
+		WaitGroup: &sync.WaitGroup{},
 	})
 
 	//nolint:nestif
 	if cfg := cast.ToStringMap(plugin.PluginConfig["config"]); cfg != nil {
+		pluginInstance.Impl.ExitOnStartupError = cast.ToBool(cfg["exitOnStartupError"])
+
+		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
+		if pluginInstance.Impl.RedisURL == "" {
+			logger.Warn("redisURL is empty, defaulting to redis://localhost:6379")
+			pluginInstance.Impl.RedisURL = "redis://localhost:6379"
+		}
+
+		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
+		if pluginInstance.Impl.Expiry <= 0 {
+			logger.Warn("expiry is invalid or unset, defaulting to 1h")
+			pluginInstance.Impl.Expiry = cast.ToDuration("1h")
+		}
+
+		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
+
+		pluginInstance.Impl.ScanCount = cast.ToInt64(cfg["scanCount"])
+		if pluginInstance.Impl.ScanCount <= 0 {
+			logger.Warn("scanCount is invalid or unset, defaulting to 1000")
+			pluginInstance.Impl.ScanCount = 1000
+		}
+
 		metricsConfig := metrics.NewMetricsConfig(cfg)
 		if metricsConfig != nil && metricsConfig.Enabled {
 			go metrics.ExposeMetrics(metricsConfig, logger)
 		}
 
-		// Initialize the API client to get proxies from GatewayD.
 		apiGRPCAddress := cast.ToString(cfg["apiGRPCAddress"])
 		apiClientConn, err := grpc.NewClient(
 			apiGRPCAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil || apiClientConn == nil {
-			logger.Error("Failed to initialize API client", "error", err)
-			if pluginInstance.Impl.ExitOnStartupError {
-				logger.Info("Exiting due to startup error")
-				if apiClientConn != nil {
-					apiClientConn.Close()
-				}
-				os.Exit(1)
-			}
+			handleStartupError(
+				logger, pluginInstance.Impl.ExitOnStartupError,
+				"Failed to initialize API client", err, apiClientConn)
 		}
 		defer apiClientConn.Close()
 		pluginInstance.Impl.APIClient = apiV1.NewGatewayDAdminAPIServiceClient(apiClientConn)
 
 		cacheBufferSize := cast.ToUint(cfg["cacheBufferSize"])
 		if cacheBufferSize <= 0 {
-			cacheBufferSize = 100 // default value
+			cacheBufferSize = 100
 		}
 
 		pluginInstance.Impl.UpdateCacheChannel = make(chan *v1.Struct, cacheBufferSize)
+		pluginInstance.Impl.WaitGroup.Add(1)
 		go pluginInstance.Impl.UpdateCache(context.Background())
-
-		pluginInstance.Impl.RedisURL = cast.ToString(cfg["redisURL"])
-		pluginInstance.Impl.Expiry = cast.ToDuration(cfg["expiry"])
-		pluginInstance.Impl.DefaultDBName = cast.ToString(cfg["defaultDBName"])
-		pluginInstance.Impl.ScanCount = cast.ToInt64(cfg["scanCount"])
-		pluginInstance.Impl.ExitOnStartupError = cast.ToBool(cfg["exitOnStartupError"])
 
 		redisConfig, err := redis.ParseURL(pluginInstance.Impl.RedisURL)
 		if err != nil {
-			logger.Error("Failed to parse Redis URL", "error", err)
-			if pluginInstance.Impl.ExitOnStartupError {
-				logger.Info("Exiting due to startup error")
-				if apiClientConn != nil {
-					apiClientConn.Close()
-				}
-				os.Exit(1) //nolint:gocritic
-			}
+			handleStartupError(
+				logger, pluginInstance.Impl.ExitOnStartupError,
+				"Failed to parse Redis URL", err, apiClientConn)
 		}
 
 		pluginInstance.Impl.RedisClient = redis.NewClient(redisConfig)
 
-		// Ping the Redis server to check if it is available.
 		_, err = pluginInstance.Impl.RedisClient.Ping(context.Background()).Result()
 		if err != nil {
-			logger.Error("Failed to ping Redis server", "error", err)
-			if pluginInstance.Impl.ExitOnStartupError {
-				logger.Info("Exiting due to startup error")
-				if apiClientConn != nil {
-					apiClientConn.Close()
-				}
-				os.Exit(1)
-			}
+			handleStartupError(
+				logger, pluginInstance.Impl.ExitOnStartupError,
+				"Failed to ping Redis server", err, apiClientConn)
 		}
 
 		pluginInstance.Impl.PeriodicInvalidatorEnabled = cast.ToBool(
@@ -120,13 +138,17 @@ func main() {
 		pluginInstance.Impl.PeriodicInvalidatorInterval = cast.ToDuration(
 			cfg["periodicInvalidatorInterval"])
 
-		// Start the periodic invalidator.
 		if pluginInstance.Impl.PeriodicInvalidatorEnabled {
 			pluginInstance.Impl.PeriodicInvalidator()
 		}
 	}
 
-	defer close(pluginInstance.Impl.UpdateCacheChannel)
+	defer func() {
+		if pluginInstance.Impl.UpdateCacheChannel != nil {
+			close(pluginInstance.Impl.UpdateCacheChannel)
+			pluginInstance.Impl.WaitGroup.Wait()
+		}
+	}()
 
 	goplugin.Serve(&goplugin.ServeConfig{
 		HandshakeConfig: goplugin.HandshakeConfig{
