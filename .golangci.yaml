@@ -35,7 +35,7 @@ linters-settings:
           - "github.com/prometheus/client_golang"
           - "github.com/hashicorp/go-plugin"
           - "github.com/hashicorp/go-hclog"
-          - "github.com/go-redis/redis/v8"
+          - "github.com/redis/go-redis/v9"
           - "github.com/getsentry/sentry-go"
           - "github.com/spf13/cast"
           - "github.com/go-co-op/gocron"

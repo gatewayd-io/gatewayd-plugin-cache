@@ -12,7 +12,7 @@ import (
 	sdkPlugin "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	apiV1 "github.com/gatewayd-io/gatewayd/api/v1"
-	goRedis "github.com/go-redis/redis/v8"
+	goRedis "github.com/redis/go-redis/v9"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/spf13/cast"

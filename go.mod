@@ -8,11 +8,11 @@ require (
 	github.com/gatewayd-io/gatewayd-plugin-sdk v0.4.4
 	github.com/getsentry/sentry-go v0.42.0
 	github.com/go-co-op/gocron v1.37.0
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.7.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/prometheus/client_golang v1.23.2
+	github.com/redis/go-redis/v9 v9.18.0
 	github.com/spf13/cast v1.10.0
 	github.com/stretchr/testify v1.11.1
 	github.com/zenizh/go-capturer v0.0.0-20211219060012-52ea6c8fed04
@@ -35,13 +35,11 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/run v1.1.0 // indirect
-	github.com/onsi/gomega v1.34.1 // indirect
 	github.com/pganalyze/pg_query_go/v6 v6.2.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
-	github.com/redis/go-redis/v9 v9.18.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect

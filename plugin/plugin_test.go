@@ -11,7 +11,7 @@ import (
 	sdkAct "github.com/gatewayd-io/gatewayd-plugin-sdk/act"
 	"github.com/gatewayd-io/gatewayd-plugin-sdk/logging"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"github.com/hashicorp/go-hclog"
 	pgproto3 "github.com/jackc/pgx/v5/pgproto3"
 	"github.com/stretchr/testify/assert"
