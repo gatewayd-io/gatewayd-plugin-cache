@@ -12,9 +12,9 @@ import (
 	sdkPlugin "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin"
 	v1 "github.com/gatewayd-io/gatewayd-plugin-sdk/plugin/v1"
 	apiV1 "github.com/gatewayd-io/gatewayd/api/v1"
-	goRedis "github.com/redis/go-redis/v9"
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
+	goRedis "github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 	"google.golang.org/grpc"
 )
@@ -250,41 +250,43 @@ func (p *Plugin) UpdateCache(ctx context.Context) {
 		}
 
 		cacheKey := strings.Join([]string{server["remote"], database, string(request)}, ":")
-		if errorResponse == "" && rowDescription != "" && dataRow != nil && len(dataRow) > 0 {
-			query, err := postgres.GetQueryFromRequest(request)
-			if err != nil {
-				p.Logger.Debug("Failed to get query from request", "error", err)
-				continue
-			}
+		if errorResponse != "" || rowDescription == "" || dataRow == nil || len(dataRow) == 0 {
+			continue
+		}
 
-			if !IsCacheNeeded(strings.ToUpper(query)) {
-				continue
-			}
+		query, err := postgres.GetQueryFromRequest(request)
+		if err != nil {
+			p.Logger.Debug("Failed to get query from request", "error", err)
+			continue
+		}
 
-			// The request was successful and the response contains data. Cache the response.
-			if err := p.RedisClient.Set(ctx, cacheKey, response, p.Expiry).Err(); err != nil {
+		if !IsCacheNeeded(strings.ToUpper(query)) {
+			continue
+		}
+
+		// The request was successful and the response contains data. Cache the response.
+		if err := p.RedisClient.Set(ctx, cacheKey, response, p.Expiry).Err(); err != nil {
+			CacheErrorsCounter.Inc()
+			p.Logger.Debug("Failed to set cache", "error", err)
+		}
+		CacheSetsCounter.Inc()
+
+		tables, err := postgres.GetTablesFromQuery(query)
+		if err != nil {
+			p.Logger.Debug("Failed to get tables from query", "error", err)
+			continue
+		}
+
+		// Cache the table(s) used in each cached request. This is used to invalidate
+		// the cache when a rows is inserted, updated or deleted into that table.
+		for _, table := range tables {
+			requestQueryCacheKey := strings.Join([]string{table, cacheKey}, ":")
+			if err := p.RedisClient.Set(
+				ctx, requestQueryCacheKey, "", p.Expiry).Err(); err != nil {
 				CacheErrorsCounter.Inc()
 				p.Logger.Debug("Failed to set cache", "error", err)
 			}
 			CacheSetsCounter.Inc()
-
-			tables, err := postgres.GetTablesFromQuery(query)
-			if err != nil {
-				p.Logger.Debug("Failed to get tables from query", "error", err)
-				continue
-			}
-
-			// Cache the table(s) used in each cached request. This is used to invalidate
-			// the cache when a rows is inserted, updated or deleted into that table.
-			for _, table := range tables {
-				requestQueryCacheKey := strings.Join([]string{table, cacheKey}, ":")
-				if err := p.RedisClient.Set(
-					ctx, requestQueryCacheKey, "", p.Expiry).Err(); err != nil {
-					CacheErrorsCounter.Inc()
-					p.Logger.Debug("Failed to set cache", "error", err)
-				}
-				CacheSetsCounter.Inc()
-			}
 		}
 	}
 }
