@@ -297,7 +297,9 @@ func (p *Plugin) OnTrafficFromServer(
 	_ context.Context, resp *v1.Struct,
 ) (*v1.Struct, error) {
 	p.Logger.Debug("Traffic is coming from the server side")
-	p.UpdateCacheChannel <- proto.Clone(resp).(*v1.Struct)
+	if cloned, ok := proto.Clone(resp).(*v1.Struct); ok {
+		p.UpdateCacheChannel <- cloned
+	}
 	return resp, nil
 }
 

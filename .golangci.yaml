@@ -39,5 +39,5 @@ linters-settings:
           - "github.com/getsentry/sentry-go"
           - "github.com/spf13/cast"
           - "github.com/go-co-op/gocron"
-          - "google.golang.org/protobuf/types/known/emptypb"
+          - "google.golang.org/protobuf"
           - "google.golang.org/grpc"
