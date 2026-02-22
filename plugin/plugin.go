@@ -17,6 +17,7 @@ import (
 	goRedis "github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 )
 
 type Plugin struct {
@@ -296,7 +297,7 @@ func (p *Plugin) OnTrafficFromServer(
 	_ context.Context, resp *v1.Struct,
 ) (*v1.Struct, error) {
 	p.Logger.Debug("Traffic is coming from the server side")
-	p.UpdateCacheChannel <- resp
+	p.UpdateCacheChannel <- proto.Clone(resp).(*v1.Struct)
 	return resp, nil
 }
 
